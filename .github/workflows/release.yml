@@ -48,6 +48,16 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
           "
 
+      - name: Create the release first
+        # electron-builder uploads files in parallel, and each upload can create its own release
+        # for the same tag. Creating the release here means every upload goes into this one.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$VERSION" --notes "Tide Browser $VERSION"
+
       - run: npm ci
 
       - name: Build the installer and publish the release
