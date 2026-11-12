@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Focus</title>
+<link rel="stylesheet" href="shared.css">
+<script src="common.js"></script>
+<style>
+  main { max-width: 760px; }
+  .card { border: 1px solid var(--line); border-radius: 20px; padding: 22px 24px; background: var(--surface); margin-top: 16px; animation: rowIn .6s var(--expo) backwards; animation-delay: calc(var(--i, 0) * 60ms); }
+  .card h3 { margin: 0 0 4px; font-weight: 500; font-size: 16px; }
+  .card p { margin: 4px 0 14px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .big { font-size: 44px; font-weight: 200; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+  .state { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .pulse { width: 12px; height: 12px; border-radius: 50%; background: var(--border); flex: none; }
+  .on .pulse { background: var(--ok); box-shadow: none; animation: pl 2s ease-in-out infinite; }
+  @keyframes pl { 50% { transform: scale(1.5); opacity: .6; } }
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn.pri { background: var(--accent-bg); border-color: var(--accent-line); color: var(--on-accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-radius: 16px; background: rgb(var(--glow-rgb) / .12); border: 1px solid rgb(var(--glow-rgb) / .3); font-size: 13px; animation: rowIn .4s var(--expo) backwards; }
+  .chip button { border: 0; background: none; color: var(--muted); cursor: pointer; width: 20px; height: 20px; border-radius: 50%; }
+  .chip button:hover { background: rgb(var(--ov) / .12); color: var(--text-strong); }
+  .sug { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .sug button { margin: 3px 4px 0 0; border: 1px dashed var(--border); background: none; color: var(--muted); border-radius: 14px; padding: 4px 10px; cursor: pointer; font-size: 12px; transition: color .2s, border-color .2s; }
+  .sug button:hover { color: var(--accent); border-color: var(--accent); }
+  .days { display: flex; gap: 6px; margin: 10px 0; }
+  .days label { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; transition: background .25s, border-color .25s; user-select: none; }
+  .days input { display: none; }
+  .days input:checked + span { color: var(--on-accent); }
+  .days label:has(input:checked) { background: var(--accent-bg); border-color: var(--accent-line); color: var(--on-accent); }
+  input[type=time] { height: 36px; border-radius: 18px; padding: 0 14px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font: 14px "Segoe UI", system-ui, sans-serif; }
+  .sw { position: relative; width: 52px; height: 30px; flex: none; cursor: pointer; }
+  .sw input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .sw span { position: absolute; inset: 0; border-radius: 15px; border: 1px solid var(--border); background: var(--surface2); transition: background .4s, border-color .4s; }
+  .sw span::after { content: ""; position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .5s var(--spring), background .3s; }
+  .sw input:checked + span { background: rgb(var(--glow-rgb) / .28); border-color: rgb(var(--glow-rgb) / .7); }
+  .sw input:checked + span::after { transform: translateX(22px); background: var(--accent-soft); }
+</style>
+</head>
+<body>
+  <header class="bar"><h1>Focus</h1></header>
+  <main>
+    <div class="card" style="--i:0" id="status">
+      <div class="state" id="stateRow"><div class="pulse"></div><div><div class="big" id="clock">Off</div><div id="sub" style="color:var(--muted);font-size:13px"></div></div></div>
+      <div class="row2" style="margin-top:16px" id="actions"></div>
+    </div>
+
+    <div class="card" style="--i:1">
+      <h3>Blocked sites</h3>
+      <p>While focus is on, these sites show a reminder instead of loading. You can still override after a short wait.</p>
+      <div class="chips" id="chips"></div>
+      <div class="row2"><input type="text" id="add" placeholder="Add a site, for example reddit.com" autocomplete="off" style="width:300px"><button class="btn" id="addBtn">Add</button></div>
+      <div class="sug" id="sug">Quick add: </div>
+    </div>
+
+    <div class="card" style="--i:2">
+      <div class="row2" style="justify-content:space-between"><div><h3>Schedule</h3><p style="margin-bottom:0">Turn focus on automatically at set times.</p></div><label class="sw"><input type="checkbox" id="schedOn"><span></span></label></div>
+      <div id="schedBody">
+        <div class="days" id="days"></div>
+        <div class="row2"><span style="color:var(--muted);font-size:13px">From</span><input type="time" id="start" value="09:00"><span style="color:var(--muted);font-size:13px">to</span><input type="time" id="end" value="17:00"></div>
+      </div>
+    </div>
+  </main>
+  <script>
+    const api = window.tidePage;
+    let st = { sites: [], schedule: { enabled: false, days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }, active: false, until: 0 };
+    const $ = (id) => document.getElementById(id);
+    const SUG = ['youtube.com', 'reddit.com', 'x.com', 'instagram.com', 'facebook.com', 'tiktok.com', 'netflix.com', 'twitch.tv'];
+
+    function clock() {
+      const left = st.until - Date.now();
+      $('stateRow').classList.toggle('on', st.active && left > 0);
+      if (st.active && left > 0) {
+        const s = Math.floor(left / 1000); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sec = s % 60;
+        $('clock').textContent = h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+        $('sub').textContent = `Focus is on until ${new Date(st.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      } else { $('clock').textContent = 'Off'; $('sub').textContent = st.sites.length ? 'Start a session when you are ready to work.' : 'Add the sites you want to avoid, then start a session.'; if (st.active) refresh(); }
+    }
+    function actions() {
+      const a = $('actions'); a.textContent = '';
+      const b = (label, fn, cls) => { const x = document.createElement('button'); x.className = 'btn ' + (cls || ''); x.textContent = label; x.onclick = fn; a.appendChild(x); };
+      if (st.active) b('End focus', async () => { st = { ...st, ...(await api.focusStop()) }; render(); });
+      else { for (const m of [25, 50, 90]) b(`${m} minutes`, async () => { st = { ...st, ...(await api.focusStart(m)) }; render(); }, m === 25 ? 'pri' : ''); }
+    }
+    function chips() {
+      const c = $('chips'); c.textContent = '';
+      if (!st.sites.length) { const e = document.createElement('span'); e.style.cssText = 'color:var(--muted);font-size:13px'; e.textContent = 'No sites yet.'; c.appendChild(e); }
+      st.sites.forEach((s) => {
+        const d = document.createElement('div'); d.className = 'chip'; d.append(document.createTextNode(s));
+        const x = document.createElement('button'); x.textContent = '✕'; x.title = 'Remove';
+        x.onclick = async () => { st.sites = st.sites.filter((v) => v !== s); await api.focusSet({ sites: st.sites }); render(); };
+        d.appendChild(x); c.appendChild(d);
+      });
+      const sug = $('sug'); sug.textContent = 'Quick add: ';
+      SUG.filter((s) => !st.sites.includes(s)).forEach((s) => { const b = document.createElement('button'); b.textContent = s; b.onclick = async () => { st.sites.push(s); await api.focusSet({ sites: st.sites }); render(); }; sug.appendChild(b); });
+    }
+    function sched() {
+      $('schedOn').checked = st.schedule.enabled;
+      $('schedBody').style.opacity = st.schedule.enabled ? 1 : .45;
+      $('start').value = st.schedule.start; $('end').value = st.schedule.end;
+      const d = $('days'); d.textContent = '';
+      ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((l, i) => {
+        const lab = document.createElement('label'); const inp = document.createElement('input'); inp.type = 'checkbox'; inp.checked = st.schedule.days.includes(i);
+        inp.onchange = () => { st.schedule.days = inp.checked ? [...new Set([...st.schedule.days, i])] : st.schedule.days.filter((x) => x !== i); saveSched(); };
+        const sp = document.createElement('span'); sp.textContent = l; lab.append(inp, sp); d.appendChild(lab);
+      });
+    }
+    const saveSched = async () => { st = { ...st, ...(await api.focusSet({ schedule: st.schedule })) }; render(); };
+    function render() { actions(); chips(); sched(); clock(); }
+    async function refresh() { st = { ...st, ...(await api.focusGet()) }; render(); }
+    async function addSite() { const v = $('add').value.trim(); if (!v) return; $('add').value = ''; await api.focusSet({ sites: [...st.sites, v] }); refresh(); }
+    $('addBtn').onclick = addSite;
+    $('add').addEventListener('keydown', (e) => { if (e.key === 'Enter') addSite(); });
+    $('schedOn').onchange = (e) => { st.schedule.enabled = e.target.checked; saveSched(); };
+    $('start').onchange = (e) => { st.schedule.start = e.target.value || '09:00'; saveSched(); };
+    $('end').onchange = (e) => { st.schedule.end = e.target.value || '17:00'; saveSched(); };
+    setInterval(clock, 1000);
+    refresh();
+  </script>
+</body>
+</html>

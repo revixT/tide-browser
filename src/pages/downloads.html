@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Downloads</title>
+<link rel="stylesheet" href="shared.css">
+<script src="common.js"></script>
+<style>
+  .row { cursor: default; }
+  .info { flex: 1; min-width: 0; }
+  .bar2 { height: 4px; border-radius: 2px; background: var(--track); margin-top: 7px; overflow: hidden; }
+  .bar2 > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-line), var(--accent-soft)); transition: width 1s linear; box-shadow: none; }
+  .state { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .state.bad { color: var(--bad); }
+  .row .x { opacity: 1; }
+  .btn.sm { height: 30px; padding: 0 14px; font-size: 12px; }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <h1>Downloads</h1>
+    <span style="flex:1"></span>
+    <button class="btn" id="clear">Clear list</button>
+  </header>
+  <main id="list"></main>
+  <script>
+    const list = document.getElementById('list');
+    const fmt = (n) => n > 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+    const act = (id, a) => window.tidePage.downloadAction(id, a).then(load);
+    const btn = (label, fn, cls = '') => { const b = document.createElement('button'); b.className = 'btn sm ' + cls; b.textContent = label; b.onclick = fn; return b; };
+    let firstPaint = true;
+
+    function render(items) {
+      // Only the first paint animates; the list is refreshed every second for progress.
+      list.classList.toggle('animate', firstPaint);
+      firstPaint = false;
+      let n = 0;
+      list.textContent = '';
+      if (!items.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'No downloads yet.'; list.appendChild(d); return; }
+      for (const d of items) {
+        const row = document.createElement('div'); row.className = 'row'; row.style.setProperty('--i', n++);
+        const info = document.createElement('div'); info.className = 'info';
+        const t = document.createElement('div'); t.className = 'title'; t.textContent = d.name;
+        const s = document.createElement('div'); s.className = 'state';
+        const live = d.state === 'progressing' || d.state === 'paused';
+        if (live) {
+          s.textContent = (d.state === 'paused' ? 'Paused · ' : '') + (d.total ? `${fmt(d.received)} of ${fmt(d.total)}` : fmt(d.received));
+          info.append(t, s);
+          if (d.total) { const b = document.createElement('div'); b.className = 'bar2'; const i = document.createElement('i'); i.style.width = Math.min(100, d.received / d.total * 100) + '%'; b.appendChild(i); info.appendChild(b); }
+        } else {
+          let host = '';
+          try { host = new URL(d.url).hostname; } catch {}
+          s.textContent = d.state === 'completed' ? `${fmt(d.received)} · ${host}` : d.state === 'cancelled' ? 'Cancelled' : `Failed (${d.state})`;
+          if (d.state !== 'completed') s.classList.add('bad');
+          if (d.state === 'completed' && d.risky) { s.textContent += d.vt && d.vt.malicious ? ' · Flagged by security engines. Do not open it.' : ' · This type of file can run code. Open it only if you trust the site.'; s.classList.add('bad'); }
+          info.append(t, s);
+        }
+        if (d.sha256 && !live) {
+          const f = document.createElement('div'); f.className = 'state';
+          let vtText = 'Not checked with VirusTotal';
+          if (d.vt) {
+            if (d.vt.error) vtText = d.vt.error;
+            else if (d.vt.unknown) vtText = 'VirusTotal has not seen this file';
+            else if (d.vt.malicious || d.vt.suspicious) vtText = `VirusTotal: ${d.vt.malicious} of ${d.vt.total} engines flag it`;
+            else vtText = `VirusTotal: clean (${d.vt.total} engines checked)`;
+          }
+          const bad = d.vt && (d.vt.malicious || d.vt.suspicious);
+          const sp = document.createElement('span'); sp.textContent = vtText + '  ·  SHA-256 ' + d.sha256.slice(0, 12) + '…  ';
+          if (bad) sp.style.color = 'var(--bad)'; else if (d.vt && !d.vt.error && !d.vt.unknown) sp.style.color = 'var(--ok)';
+          const lnk = document.createElement('a'); lnk.textContent = 'Check on VirusTotal'; lnk.style.cssText = 'color:var(--accent);cursor:pointer;text-decoration:underline';
+          lnk.onclick = () => window.open('https://www.virustotal.com/gui/file/' + d.sha256, '_blank');
+          const cp = document.createElement('a'); cp.textContent = '  Copy fingerprint'; cp.style.cssText = 'color:var(--accent);cursor:pointer;text-decoration:underline';
+          cp.onclick = () => navigator.clipboard.writeText(d.sha256).catch(() => {});
+          f.append(sp, lnk, cp); info.appendChild(f);
+        }
+        row.appendChild(info);
+        if (live) {
+          row.append(btn(d.state === 'paused' ? 'Resume' : 'Pause', () => act(d.id, d.state === 'paused' ? 'resume' : 'pause')), btn('Cancel', () => act(d.id, 'cancel')));
+        } else if (d.state === 'completed') {
+          row.append(btn('Open', () => act(d.id, 'open')), btn('Show in folder', () => act(d.id, 'show')));
+        }
+        if (!live) { const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove from list'; x.onclick = () => act(d.id, 'remove'); row.appendChild(x); }
+        list.appendChild(row);
+      }
+    }
+    function load() { return window.tidePage.getDownloads().then(render); }
+    document.getElementById('clear').onclick = async () => { await window.tidePage.clearDownloads(); load(); };
+    load();
+    setInterval(load, 1000);
+  </script>
+</body>
+</html>

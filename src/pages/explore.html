@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Explore Tide</title>
+<link rel="stylesheet" href="shared.css">
+<script src="common.js"></script>
+<style>
+  main { max-width: 1040px; padding-top: 18px; }
+  .lead { color: var(--muted); margin: 4px 0 22px; font-size: 14px; max-width: 640px; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+  .card { position: relative; border: 1px solid var(--line); border-radius: 20px; padding: 20px 22px; background: var(--surface); cursor: pointer; overflow: hidden;
+    animation: rowIn .7s var(--expo) backwards; animation-delay: calc(var(--i) * 55ms); transition: transform .4s var(--spring), border-color .3s, box-shadow .4s; }
+  .card::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+    background: radial-gradient(220px circle at var(--px, 50%) var(--py, 0%), rgb(var(--glow-rgb) / .18), transparent 70%); }
+  .card:hover { transform: translateY(-4px); border-color: rgb(var(--glow-rgb) / .55); box-shadow: 0 0 26px rgb(var(--glow-rgb) / calc(.22 * var(--fx))); }
+  .card:hover::before { opacity: 1; }
+  .card svg { width: 30px; height: 30px; color: var(--accent); margin-bottom: 12px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; font-weight: 500; }
+  .card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .card .st { margin-top: 12px; font-size: 12px; color: var(--accent); }
+  .card.tip { cursor: default; background: transparent; border-style: dashed; }
+  .card.tip:hover { transform: none; box-shadow: none; border-color: var(--line); }
+  .card.tip::before { display: none; }
+  kbd { font: 12px "Segoe UI", system-ui, sans-serif; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); }
+  h2.sec { margin: 30px 0 12px; }
+</style>
+</head>
+<body>
+  <header class="bar"><h1>Explore Tide</h1></header>
+  <main>
+    <p class="lead">Tools that make Tide different. They all run on your PC, and nothing here sends your browsing anywhere.</p>
+    <div class="grid" id="grid"></div>
+    <h2 class="sec">Quick tricks</h2>
+    <div class="grid" id="tips"></div>
+  </main>
+  <script>
+    const api = window.tidePage;
+    const svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const FEATURES = [
+      { id: 'recall', title: 'Recall', icon: svg('<path d="M4 5.5h16M4 10h10M4 14.5h7"/><circle cx="17" cy="16.5" r="3.2"/><path d="M19.4 18.9l2 2"/>'), text: 'Search the text of every page you have read, even when you forgot the title. Private and encrypted on this PC.', go: 'browser://recall' },
+      { id: 'orbits', title: 'Orbits', icon: svg('<circle cx="12" cy="12" r="2.4"/><ellipse cx="12" cy="12" rx="9" ry="4" transform="rotate(-25 12 12)"/>'), text: 'Tabs you have not touched drift out of your tab strip into a shelf you can search and bring back.', go: 'browser://orbits' },
+      { id: 'trail', title: 'Trail', icon: svg('<circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="12" r="2.2"/><circle cx="6" cy="18" r="2.2"/><path d="M8 6.8l8 4M8 17.2l8-4"/>'), text: 'A tree of how you got from page to page, so you can find your way back in a long research session.', go: 'browser://trail' },
+      { id: 'constellations', title: 'Constellations', icon: svg('<path d="M12 3.5l1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7L6.7 7.4l3.7-.5z" transform="translate(0 4) scale(.85) translate(2 0)"/><path d="M4 20l5-3M15 18l5 2"/>'), text: 'Collect pages onto a star map. Drag stars around and connect the ones that belong together.', go: 'browser://constellations' },
+      { id: 'focus', title: 'Focus', icon: svg('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>'), text: 'Block the sites that eat your day, on a timer or a schedule, with a short pause before you can override it.', go: 'browser://focus' },
+      { id: 'snapshots', title: 'Snapshots', icon: svg('<rect x="3.5" y="6.5" width="17" height="12" rx="2.5"/><circle cx="12" cy="12.5" r="3"/><path d="M8 6.5l1.2-2h5.6l1.2 2"/>'), text: 'Tide saves your open tabs every 30 minutes. Go back to how things looked this morning.', go: 'browser://snapshots' },
+    ];
+    const TIPS = [
+      { title: 'Command bar', text: 'Press <kbd>Ctrl</kbd> + <kbd>K</kbd> to jump to any tab, search your history and Recall, or run an action.' },
+      { title: 'Peek at links', text: 'Hold the mouse button down on a link, or <kbd>Alt</kbd> + click it, to preview the page without leaving this one.' },
+      { title: 'Reader view', text: 'Press <kbd>F9</kbd> on an article to read it cleanly, or have it read aloud.' },
+      { title: 'Site privacy panel', text: 'Click the padlock in the address bar to see what a site did, turn off blocking for it, or forget it completely.' },
+    ];
+    const grid = document.getElementById('grid');
+    FEATURES.forEach((f, i) => {
+      const el = document.createElement('div');
+      el.className = 'card'; el.style.setProperty('--i', i);
+      el.innerHTML = f.icon;
+      const h = document.createElement('h3'); h.textContent = f.title;
+      const p = document.createElement('p'); p.textContent = f.text;
+      const st = document.createElement('div'); st.className = 'st'; st.id = 'st-' + f.id;
+      el.append(h, p, st);
+      el.onclick = () => api.navigate(f.go);
+      el.addEventListener('mousemove', (e) => { const r = el.getBoundingClientRect(); el.style.setProperty('--px', ((e.clientX - r.left) / r.width * 100) + '%'); el.style.setProperty('--py', ((e.clientY - r.top) / r.height * 100) + '%'); });
+      grid.appendChild(el);
+    });
+    TIPS.forEach((t, i) => {
+      const el = document.createElement('div');
+      el.className = 'card tip'; el.style.setProperty('--i', i + 6);
+      const h = document.createElement('h3'); h.textContent = t.title;
+      const p = document.createElement('p'); p.innerHTML = t.text; // static text written above, no user data
+      el.append(h, p);
+      document.getElementById('tips').appendChild(el);
+    });
+    const set = (id, text) => { const e = document.getElementById('st-' + id); if (e) e.textContent = text; };
+    api.recallStatus().then((r) => set('recall', !r.available ? 'Not available on this PC' : r.enabled ? `On. ${r.count.toLocaleString()} pages saved` : 'Off. Turn it on to start')).catch(() => {});
+    api.orbitsList().then((l) => set('orbits', l.length ? `${l.length} tab${l.length > 1 ? 's' : ''} in orbit` : 'Empty')).catch(() => {});
+    api.trailGet().then((l) => set('trail', `${l.length} page${l.length === 1 ? '' : 's'} recorded`)).catch(() => {});
+    api.constGet().then((c) => set('constellations', c.list.length ? `${c.list.length} constellation${c.list.length > 1 ? 's' : ''}` : 'None yet')).catch(() => {});
+    api.focusGet().then((f) => set('focus', f.active ? `Focus is on until ${new Date(f.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : `${f.sites.length} blocked site${f.sites.length === 1 ? '' : 's'}`)).catch(() => {});
+    api.snapshotsList().then((l) => set('snapshots', l.length ? `${l.length} saved` : 'None yet')).catch(() => {});
+  </script>
+</body>
+</html>

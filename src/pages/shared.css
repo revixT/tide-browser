@@ -1,0 +1,56 @@
+:root {
+  --spring: cubic-bezier(.34,1.56,.64,1); --expo: cubic-bezier(.16,1,.3,1); }
+
+/* ---- motion ---- */
+header.bar { animation: hdrIn .8s var(--expo) backwards; }
+header.bar h1 { animation: hdrTitle 1s var(--expo) .1s backwards; }
+header.bar > :not(h1) { animation: hdrItem .8s var(--expo) backwards; animation-delay: calc(.15s + var(--n, 0) * .08s); }
+header.bar > :nth-child(2) { --n: 1; } header.bar > :nth-child(3) { --n: 2; }
+@keyframes hdrIn { from { opacity: 0; transform: translateY(-20px); } }
+@keyframes hdrTitle { from { opacity: 0; transform: translateX(-24px); filter: blur(8px); letter-spacing: .3em; } }
+@keyframes hdrItem { from { opacity: 0; transform: translateY(-10px) scale(.9); } }
+/* list rows: only the first paint animates (the pages add .animate once) */
+.animate .row { animation: rowIn .7s var(--expo) backwards; animation-delay: calc(.2s + min(var(--i, 0), 14) * 38ms); }
+.animate h2, .animate .empty { animation: rowIn .7s var(--expo) .2s backwards; }
+@keyframes rowIn { from { opacity: 0; transform: translateY(22px) scale(.97); filter: blur(5px); } }
+.row { transition: background .25s, transform .35s var(--spring); }
+.row:hover { transform: translateX(6px); }
+.btn { transition: transform .3s var(--spring), border-color .25s, box-shadow .3s; }
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: scale(.94); }
+.x { transition: background .25s, color .25s, transform .35s var(--spring); }
+.x:hover { transform: rotate(90deg) scale(1.1); }
+input[type=text], select { transition: border-color .3s, box-shadow .4s; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-delay: 0s !important; transition-duration: .001ms !important; } }
+html.reduce *, html.reduce *::before, html.reduce *::after { animation-duration: .001ms !important; animation-delay: 0s !important; transition-duration: .001ms !important; }
+.row .x { opacity: 0; }
+.row:hover .x, .row:focus-within .x { opacity: 1; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; }
+header.bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 14px; align-items: center; padding: 18px 40px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent); border-bottom: 1px solid var(--line); }
+h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: .3px; }
+input[type=text], select { height: 36px; border-radius: 18px; padding: 0 16px; border: 1px solid var(--border); background: var(--surface);
+  color: inherit; outline: 0; font-size: 14px; font-family: inherit; }
+input[type=text]:focus, select:focus { border-color: rgb(var(--glow-rgb) / .7); box-shadow: 0 0 12px rgb(var(--glow-rgb) / calc(.25 * var(--fx))); }
+.search { flex: 1; max-width: 480px; }
+.btn { height: 36px; padding: 0 18px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; font-size: 13px; font-family: inherit; }
+.btn:hover { border-color: rgb(var(--glow-rgb) / .6); box-shadow: 0 0 10px rgb(var(--glow-rgb) / calc(.25 * var(--fx))); }
+main { padding: 10px 40px 60px; max-width: 980px; }
+h2 { font-size: 12px; font-weight: 500; color: var(--muted); margin: 24px 0 6px; text-transform: uppercase; letter-spacing: 1px; }
+.row { display: flex; gap: 14px; padding: 10px 12px; border-radius: 12px; cursor: pointer; align-items: center; }
+.row:hover { background: rgb(var(--ov) / .06); }
+.row img.fav { width: 18px; height: 18px; border-radius: 4px; flex: none; }
+.t { color: var(--muted); font-size: 12px; width: 64px; flex: none; }
+.title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 420px; }
+.url { color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.empty { color: var(--muted); padding: 50px 12px; }
+.x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; width: 28px; height: 28px; border-radius: 50%; flex: none; }
+.x:hover { background: rgb(var(--ov) / .1); color: var(--text-strong); }
+
+/* ================= minimal pass ================= */
+header.bar { background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(10px); }
+.btn { background: transparent; border-color: var(--border); }
+.btn:hover { background: var(--hover); border-color: var(--border); box-shadow: none; }
+input[type=text]:focus, select:focus { border-color: rgb(var(--glow-rgb) / .55); box-shadow: 0 0 0 3px rgb(var(--glow-rgb) / .12); }
+.row:hover { background: rgb(var(--ov) / .05); }

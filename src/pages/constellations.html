@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Constellations</title>
+<link rel="stylesheet" href="shared.css">
+<script src="common.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  .body { flex: 1; display: flex; min-height: 0; }
+  aside { width: 250px; flex: none; border-right: 1px solid var(--line); padding: 14px; overflow: auto; }
+  .ci { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; cursor: pointer; transition: background .25s, transform .3s var(--spring); animation: rowIn .45s var(--expo) backwards; animation-delay: calc(var(--i) * 30ms); }
+  .ci:hover { background: rgb(var(--ov) / .07); transform: translateX(3px); }
+  .ci.on { background: rgb(var(--ov) / .07); box-shadow: inset 0 0 0 1px rgb(var(--glow-rgb) / calc(.3 * var(--fx))); }
+  .ci span.n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ci small { color: var(--muted); }
+  #stage { position: relative; flex: 1; min-width: 0; overflow: hidden;
+    background: radial-gradient(1.2px 1.2px at 12% 22%, rgb(var(--glow-rgb) / .6), transparent), radial-gradient(1px 1px at 72% 18%, rgb(var(--glow-rgb) / .5), transparent),
+      radial-gradient(1.4px 1.4px at 40% 70%, rgb(var(--glow-rgb) / .5), transparent), radial-gradient(1px 1px at 86% 64%, rgb(var(--glow-rgb) / .6), transparent), radial-gradient(1.2px 1.2px at 22% 88%, rgb(var(--glow-rgb) / .5), transparent); }
+  svg#sky { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .link { stroke: rgb(var(--glow-rgb) / .55); stroke-width: 1.4; stroke-linecap: round; }
+  .star { cursor: grab; }
+  .star.drag { cursor: grabbing; }
+  .star .core { fill: var(--accent); filter: drop-shadow(0 0 7px var(--accent)); transition: r .25s var(--spring); }
+  .star:hover .core, .star.pick .core { r: 11; }
+  .star.pick .ring { opacity: 1; }
+  .star .ring { fill: none; stroke: var(--accent-soft); stroke-width: 1.4; opacity: 0; transition: opacity .2s; }
+  .star text { font: 12px "Segoe UI", system-ui, sans-serif; fill: var(--text); text-anchor: middle; pointer-events: none; }
+  .star .lt { font: 600 10px "Segoe UI", system-ui, sans-serif; fill: var(--on-accent); dominant-baseline: central; text-transform: uppercase; }
+  #bar { position: absolute; left: 16px; right: 16px; top: 12px; display: flex; gap: 10px; align-items: center; z-index: 2; }
+  #name { font-size: 20px; background: transparent; border: 0; border-bottom: 1px dashed transparent; color: var(--text-strong); outline: 0; padding: 4px 2px; min-width: 120px; font-family: inherit; }
+  #name:hover, #name:focus { border-bottom-color: var(--border); }
+  #hint { position: absolute; left: 16px; bottom: 14px; color: var(--muted); font-size: 12px; z-index: 2; }
+  .btn.sm { height: 30px; padding: 0 14px; font-size: 12px; }
+  .btn.danger { border-color: rgb(var(--bad-rgb) / .5); color: var(--bad); }
+  .emptybox { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); line-height: 1.7; padding: 40px; }
+</style>
+</head>
+<body>
+  <header class="bar"><h1>Constellations</h1><span style="flex:1"></span><button class="btn" id="new">New constellation</button></header>
+  <div class="body">
+    <aside id="side"></aside>
+    <div id="stage">
+      <div id="bar" style="display:none">
+        <input id="name" spellcheck="false" maxlength="60">
+        <span style="flex:1"></span>
+        <button class="btn sm" id="chain" title="Connect every star in the order they were added">Auto-connect</button>
+        <button class="btn sm" id="tidy" title="Spread the stars out in a circle">Tidy</button>
+        <button class="btn sm danger" id="del">Delete</button>
+      </div>
+      <svg id="sky"></svg>
+      <div id="hint" style="display:none">Drag a star to move it. Click one star, then Shift+click another to link or unlink them. Double-click to open. Right-click to remove.</div>
+      <div class="emptybox" id="empty"></div>
+    </div>
+  </div>
+  <script>
+    const api = window.tidePage;
+    const NS = 'http://www.w3.org/2000/svg';
+    const sky = document.getElementById('sky');
+    let data = { list: [] };
+    let curId = null;
+    let pick = null;
+    let saveTimer = null;
+    const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+    const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+    const cur = () => data.list.find((c) => c.id === curId);
+    const el = (tag, attrs = {}, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
+    const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => api.constSave(data), 350); };
+
+    function side() {
+      const s = document.getElementById('side'); s.textContent = '';
+      data.list.forEach((c, i) => {
+        const d = document.createElement('div'); d.className = 'ci' + (c.id === curId ? ' on' : ''); d.style.setProperty('--i', i);
+        const n = document.createElement('span'); n.className = 'n'; n.textContent = c.name;
+        const k = document.createElement('small'); k.textContent = c.stars.length;
+        d.append(n, k);
+        d.onclick = () => { curId = c.id; pick = null; side(); draw(); };
+        s.appendChild(d);
+      });
+    }
+
+    function draw() {
+      const c = cur();
+      sky.textContent = '';
+      const has = !!c;
+      document.getElementById('bar').style.display = has ? 'flex' : 'none';
+      document.getElementById('hint').style.display = has && c.stars.length ? 'block' : 'none';
+      const em = document.getElementById('empty');
+      em.style.display = has && c.stars.length ? 'none' : 'flex';
+      em.textContent = !data.list.length ? 'Make your first constellation with the button above, or right-click any tab and choose "Add to constellation".'
+        : has ? 'This constellation is empty. Right-click a tab and choose "Add to constellation" to place a star here.' : 'Pick a constellation on the left.';
+      if (!has) return;
+      document.getElementById('name').value = c.name;
+      const W = sky.clientWidth; const H = sky.clientHeight;
+      const pos = (s) => ({ x: 40 + s.x * (W - 80), y: 70 + s.y * (H - 130) });
+      const byId = new Map(c.stars.map((s) => [s.id, s]));
+      c.links.forEach(([a, b]) => {
+        const A = byId.get(a); const B = byId.get(b);
+        if (!A || !B) return;
+        const pa = pos(A); const pb = pos(B);
+        sky.appendChild(el('line', { class: 'link', 'data-a': a, 'data-b': b, x1: pa.x, y1: pa.y, x2: pb.x, y2: pb.y }));
+      });
+      c.stars.forEach((s) => {
+        const p = pos(s);
+        const g = el('g', { class: 'star' + (pick === s.id ? ' pick' : ''), 'data-id': s.id, transform: `translate(${p.x} ${p.y})` });
+        g.append(el('circle', { class: 'ring', r: 17 }), el('circle', { class: 'core', r: 9 }), el('text', { class: 'lt' }, (host(s.url)[0] || '?')), el('text', { y: 30 }, s.title.length > 26 ? `${s.title.slice(0, 25)}…` : s.title));
+        const t = el('title', {}, `${s.title}\n${s.url}`); g.appendChild(t);
+        let moved = false;
+        g.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0) return;
+          if (e.shiftKey && pick && pick !== s.id) { toggleLink(pick, s.id); pick = null; draw(); save(); return; }
+          g.setPointerCapture(e.pointerId); g.classList.add('drag'); moved = false;
+          const move = (ev) => {
+            const r = sky.getBoundingClientRect();
+            const nx = Math.max(0, Math.min(1, (ev.clientX - r.left - 40) / (W - 80)));
+            const ny = Math.max(0, Math.min(1, (ev.clientY - r.top - 70) / (H - 130)));
+            if (Math.abs(nx - s.x) + Math.abs(ny - s.y) > 0.003) moved = true;
+            s.x = nx; s.y = ny; const q = pos(s);
+            g.setAttribute('transform', `translate(${q.x} ${q.y})`);
+            sky.querySelectorAll(`line[data-a="${s.id}"]`).forEach((l) => { l.setAttribute('x1', q.x); l.setAttribute('y1', q.y); });
+            sky.querySelectorAll(`line[data-b="${s.id}"]`).forEach((l) => { l.setAttribute('x2', q.x); l.setAttribute('y2', q.y); });
+          };
+          const up = () => {
+            g.classList.remove('drag'); g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up);
+            if (moved) save(); else { pick = pick === s.id ? null : s.id; draw(); }
+          };
+          g.addEventListener('pointermove', move); g.addEventListener('pointerup', up);
+        });
+        g.addEventListener('dblclick', () => window.open(s.url, '_blank'));
+        g.addEventListener('contextmenu', (e) => { e.preventDefault(); c.stars = c.stars.filter((x) => x.id !== s.id); c.links = c.links.filter(([a, b]) => a !== s.id && b !== s.id); draw(); side(); save(); });
+        sky.appendChild(g);
+      });
+    }
+
+    function toggleLink(a, b) {
+      const c = cur();
+      const i = c.links.findIndex(([x, y]) => (x === a && y === b) || (x === b && y === a));
+      if (i >= 0) c.links.splice(i, 1); else c.links.push([a, b]);
+    }
+
+    document.getElementById('new').onclick = () => {
+      const c = { id: uid(), name: `Constellation ${data.list.length + 1}`, created: Date.now(), stars: [], links: [] };
+      data.list.push(c); curId = c.id; side(); draw(); save();
+    };
+    document.getElementById('name').addEventListener('input', (e) => { const c = cur(); if (c) { c.name = e.target.value || 'Constellation'; side(); save(); } });
+    document.getElementById('chain').onclick = () => { const c = cur(); if (!c) return; c.links = []; for (let i = 1; i < c.stars.length; i++) c.links.push([c.stars[i - 1].id, c.stars[i].id]); draw(); save(); };
+    document.getElementById('tidy').onclick = () => { const c = cur(); if (!c) return; c.stars.forEach((s, i) => { const a = (i / c.stars.length) * Math.PI * 2 - Math.PI / 2; s.x = 0.5 + Math.cos(a) * 0.38; s.y = 0.5 + Math.sin(a) * 0.38; }); draw(); save(); };
+    document.getElementById('del').onclick = function () {
+      if (this.dataset.armed !== '1') { this.dataset.armed = '1'; this.textContent = 'Sure?'; setTimeout(() => { this.dataset.armed = ''; this.textContent = 'Delete'; }, 3000); return; }
+      data.list = data.list.filter((c) => c.id !== curId); curId = data.list[0] ? data.list[0].id : null; this.dataset.armed = ''; this.textContent = 'Delete'; side(); draw(); save();
+    };
+    addEventListener('resize', draw);
+    api.constGet().then((d) => { data = d; curId = d.list[0] ? d.list[0].id : null; side(); draw(); });
+  </script>
+</body>
+</html>

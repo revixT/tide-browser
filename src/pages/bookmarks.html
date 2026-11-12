@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Bookmarks</title>
+<link rel="stylesheet" href="shared.css">
+<script src="common.js"></script>
+<style>
+  .row input.edit { flex: 1; height: 30px; border-radius: 15px; padding: 0 14px; font-size: 14px; }
+  .x.pen { font-size: 13px; }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <h1>Bookmarks</h1>
+    <input type="text" class="search" id="search" placeholder="Search bookmarks" autofocus>
+    <button class="btn" id="import">Import…</button>
+    <button class="btn" id="export">Export…</button>
+  </header>
+  <main id="list"></main>
+  <script>
+    let items = [];
+    let firstPaint = true;
+    const list = document.getElementById('list');
+
+    function render() {
+      list.classList.toggle('animate', firstPaint);
+      firstPaint = false;
+      let n = 0;
+      const q = document.getElementById('search').value.toLowerCase();
+      const shown = items.filter((i) => !q || i.title.toLowerCase().includes(q) || i.url.toLowerCase().includes(q));
+      list.textContent = '';
+      if (!shown.length) {
+        const d = document.createElement('div'); d.className = 'empty';
+        d.textContent = items.length ? 'No matches.' : 'No bookmarks yet. Press Ctrl+D on any page to add one, or import a bookmarks file.';
+        list.appendChild(d); return;
+      }
+      for (const b of shown) {
+        const row = document.createElement('div'); row.className = 'row'; row.style.setProperty('--i', n++);
+        if (b.favicon) { const img = document.createElement('img'); img.className = 'fav'; img.src = b.favicon; img.onerror = () => img.remove(); row.appendChild(img); }
+        const title = document.createElement('span'); title.className = 'title'; title.textContent = b.title;
+        const url = document.createElement('span'); url.className = 'url'; url.textContent = b.url;
+        const pen = document.createElement('button'); pen.className = 'x pen'; pen.textContent = '✎'; pen.title = 'Rename';
+        pen.onclick = (e) => {
+          e.stopPropagation();
+          const input = document.createElement('input');
+          input.type = 'text'; input.className = 'edit'; input.value = b.title;
+          const commit = async () => { items = await window.tidePage.renameBookmark(b.url, input.value); render(); };
+          input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') commit(); if (ev.key === 'Escape') render(); });
+          input.addEventListener('blur', commit);
+          input.addEventListener('click', (ev) => ev.stopPropagation());
+          title.replaceWith(input); input.focus(); input.select();
+        };
+        const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = 'Remove bookmark';
+        x.onclick = async (e) => {
+          e.stopPropagation();
+          await window.tidePage.removeBookmark(b.url);
+          row.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(40px)' }], { duration: 260, easing: 'ease-in', fill: 'forwards' })
+            .onfinish = () => { items = items.filter((i) => i.url !== b.url); render(); };
+        };
+        row.append(title, url, pen, x);
+        row.onclick = () => window.tidePage.navigate(b.url);
+        list.appendChild(row);
+      }
+    }
+    document.getElementById('search').addEventListener('input', render);
+    document.getElementById('import').onclick = async () => { items = await window.tidePage.importBookmarks(); render(); };
+    document.getElementById('export').onclick = () => window.tidePage.exportBookmarks();
+    window.tidePage.getBookmarks().then((b) => { items = b; render(); });
+  </script>
+</body>
+</html>

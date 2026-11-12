@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src data:">
+<link rel="stylesheet" href="../theme.css">
+<title>Warning</title>
+<script src="common.js"></script>
+<style>
+  :root {
+    --spring: cubic-bezier(.34,1.56,.64,1); --expo: cubic-bezier(.16,1,.3,1);
+    --w-bg: radial-gradient(ellipse at 50% 0%, #2a0a0f, #050204 70%); --w-text: #f3e8ea; --w-muted: #c9b4b8; --w-detail: #9a8589;
+    --w-btn-bg: #1a0d10; --w-btn-border: #5a3a40; --w-hover: #ff8a98; --w-icon: #ff6b7a; --w-link: #ff9aa6; --w-go-bg: #3a0f16; --w-go-border: #ff6b7a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --w-bg: radial-gradient(ellipse at 50% 0%, #ffe1e5, #fff7f8 70%); --w-text: #3a1218; --w-muted: #7a4a52; --w-detail: #8d6a70;
+      --w-btn-bg: #ffffff; --w-btn-border: #e6b8bf; --w-hover: #d33a4c; --w-icon: #d3364a; --w-link: #c0283c; --w-go-bg: #fff0f1; --w-go-border: #d3364a;
+    }
+  }
+  /* calm blue variant used for focus-time blocks */
+  body.focus { --w-bg: radial-gradient(ellipse at 50% 0%, #14224f, #04060f 70%); --w-text: #e8ecf8; --w-muted: #a9b4d6; --w-detail: #8590b3;
+    --w-btn-bg: #0e1430; --w-btn-border: #34406e; --w-hover: #9db5ff; --w-icon: #9db5ff; --w-link: #9db5ff; --w-go-bg: #131c42; --w-go-border: #6f8cff; }
+  @media (prefers-color-scheme: light) {
+    body.focus { --w-bg: radial-gradient(ellipse at 50% 0%, #dde6ff, #f6f8ff 70%); --w-text: #1c2750; --w-muted: #55639a; --w-detail: #6f7aa8;
+      --w-btn-bg: #ffffff; --w-btn-border: #c3cdee; --w-hover: #3556d8; --w-icon: #3556d8; --w-link: #3556d8; --w-go-bg: #eef2ff; --w-go-border: #3556d8; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--w-bg);
+    color: var(--w-text); font-family: "Segoe UI", system-ui, sans-serif; }
+  .box { max-width: 620px; padding: 32px; animation: in .7s var(--expo); }
+  @keyframes in { from { opacity: 0; transform: translateY(24px) scale(.97); filter: blur(6px); } }
+  .ic { width: 64px; height: 64px; color: var(--w-icon); filter: drop-shadow(0 0 18px rgb(var(--bad-rgb) / .6)); animation: pulse 2.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  h1 { font-size: 28px; font-weight: 500; margin: 18px 0 10px; }
+  p { color: var(--w-muted); line-height: 1.55; margin: 8px 0; }
+  .host { display: inline-block; padding: 2px 10px; border-radius: 8px; background: rgb(var(--ov) / .07); color: var(--text-strong); word-break: break-all; }
+  .detail { font: 12px ui-monospace, Consolas, monospace; color: var(--w-detail); margin-top: 14px; }
+  .row { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; align-items: center; }
+  button { height: 42px; padding: 0 24px; border-radius: 21px; border: 1px solid var(--w-btn-border); background: var(--w-btn-bg); color: var(--w-text); cursor: pointer; font: 14px "Segoe UI", system-ui, sans-serif; transition: transform .3s var(--spring), box-shadow .3s, border-color .3s; }
+  button:hover { transform: translateY(-2px); box-shadow: 0 0 18px rgb(var(--bad-rgb) / .3); border-color: var(--w-hover); }
+  button:active { transform: scale(.95); }
+  button.safe { background: var(--accent-bg); border-color: var(--accent-line); color: var(--on-accent); }
+  button.safe:hover { box-shadow: 0 0 18px rgb(var(--glow-rgb) / calc(.5 * var(--fx))); border-color: var(--accent); }
+  .adv { margin-top: 28px; font-size: 13px; }
+  .adv a { color: var(--w-link); cursor: pointer; text-decoration: underline; }
+  #go { display: none; margin-top: 12px; background: var(--w-go-bg); border-color: var(--w-go-border); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+  html.reduce *, html.reduce *::before, html.reduce *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M12 3l9 16H3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 10v4.5M12 17.2v.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <h1 id="title"></h1>
+    <p id="body"></p>
+    <p>Site: <span class="host" id="host"></span></p>
+    <div class="detail" id="detail"></div>
+    <div class="row"><button class="safe" id="back">Back to safety</button></div>
+    <div class="adv"><a id="show">I understand the risk. Show me the option to continue.</a><br><button id="go">Continue to the site anyway</button></div>
+  </div>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const kind = q.get('kind'), url = q.get('url') || '', host = q.get('host') || '', detail = q.get('detail') || '';
+    document.getElementById('host').textContent = host || url;
+    if (kind === 'cert') {
+      document.getElementById('title').textContent = 'Your connection is not private';
+      document.getElementById('body').textContent = 'Tide could not confirm that this site is who it says it is. Someone on your network might be trying to read or change what you send, such as passwords or card numbers.';
+      document.getElementById('detail').textContent = detail;
+    } else if (kind === 'focus') {
+      document.body.classList.add('focus');
+      document.getElementById('title').textContent = 'Stay on track';
+      document.getElementById('body').textContent = `You blocked this site for focus time, and about ${detail || 'a few'} minute${detail === '1' ? '' : 's'} are left. It will still be here when you are done.`;
+      document.getElementById('detail').textContent = 'You can change blocked sites on the Focus page.';
+      document.getElementById('back').textContent = 'Back to my work';
+      document.getElementById('show').style.display = 'none';
+      const go = document.getElementById('go');
+      go.style.display = 'inline-block';
+      go.disabled = true;
+      let left = 15;
+      const tick = () => { go.textContent = left > 0 ? `Continue anyway in ${left}s` : 'Continue for 10 minutes'; go.disabled = left > 0; if (left > 0) { left--; setTimeout(tick, 1000); } };
+      tick();
+      const end = document.createElement('button');
+      end.textContent = 'End focus session';
+      end.style.marginLeft = '10px';
+      end.onclick = async () => { await window.tidePage.focusStop(); window.tidePage.navigate(url); };
+      go.after(end);
+    } else {
+      document.getElementById('title').textContent = 'Dangerous site ahead';
+      document.getElementById('body').textContent = 'This site is on a public list of web addresses that currently spread malware. It may try to install harmful software or steal your information.';
+      document.getElementById('detail').textContent = 'Source: abuse.ch URLhaus data, refreshed every 12 hours.';
+    }
+    document.getElementById('back').onclick = () => window.tidePage.navigate('browser://newtab');
+    document.getElementById('show').onclick = () => { document.getElementById('go').style.display = 'inline-block'; };
+    document.getElementById('go').onclick = async () => {
+      await window.tidePage.allowSite(kind === 'cert' ? 'cert' : kind === 'focus' ? 'focus' : 'malware', url);
+      window.tidePage.navigate(url);
+    };
+  </script>
+</body>
+</html>

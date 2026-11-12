@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Sign in</title>
+<style>
+  :root { --spring: cubic-bezier(.34,1.56,.64,1); }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 26px; background: var(--surface); color: var(--text); font: 14px "Segoe UI", system-ui, sans-serif; animation: in .5s cubic-bezier(.16,1,.3,1); }
+  @keyframes in { from { opacity: 0; transform: translateY(14px); } }
+  h1 { font-size: 18px; font-weight: 500; margin: 0 0 6px; }
+  p { color: var(--muted); margin: 0 0 18px; word-break: break-all; font-size: 12px; }
+  input { width: 100%; height: 38px; margin-bottom: 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text-strong); padding: 0 14px; outline: 0; font-size: 14px; transition: border-color .3s, box-shadow .3s; }
+  input:focus { border-color: rgb(var(--glow-rgb) / .8); box-shadow: 0 0 14px rgb(var(--glow-rgb) / calc(.35 * var(--fx))); }
+  .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  button { height: 34px; padding: 0 18px; border-radius: 17px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-strong); cursor: pointer; transition: transform .3s var(--spring), box-shadow .3s; }
+  button:hover { transform: translateY(-2px); box-shadow: 0 0 14px rgb(var(--glow-rgb) / calc(.3 * var(--fx))); }
+  button.p { background: var(--accent-bg); border-color: var(--accent-line); color: var(--on-accent); }
+</style>
+</head>
+<body>
+  <h1 id="t">Sign in</h1>
+  <p id="h"></p>
+  <input id="u" placeholder="Username" autofocus autocomplete="off">
+  <input id="p" type="password" placeholder="Password" autocomplete="off">
+  <div class="acts"><button id="c">Cancel</button><button class="p" id="s">Sign in</button></div>
+  <script>
+    const q = new URLSearchParams(location.search);
+    document.getElementById('h').textContent = q.get('host') || '';
+    if (q.get('proxy')) document.getElementById('t').textContent = 'Proxy sign in';
+    const go = () => loginApi.submit(document.getElementById('u').value, document.getElementById('p').value);
+    document.getElementById('s').onclick = go;
+    document.getElementById('c').onclick = () => loginApi.cancel();
+    addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') loginApi.cancel(); });
+  </script>
+</body>
+</html>

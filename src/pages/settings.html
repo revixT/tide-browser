@@ -1,0 +1,475 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Settings</title>
+<link rel="stylesheet" href="shared.css">
+<script src="common.js"></script>
+<style>
+  .wrap { display: flex; gap: 28px; padding: 0 40px 60px; max-width: 1100px; }
+  nav { position: sticky; top: 84px; align-self: flex-start; width: 210px; flex: none; padding-top: 18px; display: flex; flex-direction: column; gap: 2px; }
+  nav button { position: relative; text-align: left; height: 40px; padding: 0 16px; border-radius: 12px; border: 0; background: none; color: var(--muted); font: 14px "Segoe UI", system-ui, sans-serif; cursor: pointer;
+    transition: background .25s, color .25s, transform .35s var(--spring); }
+  nav button:hover { background: rgb(var(--ov) / .06); color: var(--text-strong); transform: translateX(4px); }
+  nav button.on { background: rgb(var(--ov) / .07); color: var(--text-strong); box-shadow: inset 0 0 0 1px rgb(var(--glow-rgb) / calc(.22 * var(--fx))); }
+  nav button.on::before { content: ""; position: absolute; left: 0; top: 11px; bottom: 11px; width: 3px; border-radius: 2px; background: var(--accent-soft); box-shadow: none; }
+  main { flex: 1; min-width: 0; padding: 0; max-width: none; }
+  nav button.on { box-shadow: none; }
+  .card:hover { box-shadow: none; border-color: var(--border); }
+  .sec { animation: secIn .6s var(--expo); }
+  @keyframes secIn { from { opacity: 0; transform: translateY(18px); filter: blur(4px); } }
+  .sec > h2 { font-size: 22px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text); margin: 22px 0 4px; }
+  .sec > .lead { color: var(--muted); font-size: 13px; margin: 0 0 6px; }
+  .tag { display: inline-block; font-size: 10px; letter-spacing: .6px; text-transform: uppercase; color: var(--accent); border: 1px solid rgb(var(--glow-rgb) / .4); border-radius: 8px; padding: 1px 6px; margin-left: 8px; vertical-align: middle; }
+
+  .card { border: 1px solid var(--line); border-radius: 16px; padding: 16px 20px; background: var(--surface); margin-top: 12px; display: flex; align-items: center; gap: 18px;
+    animation: rowIn .6s var(--expo) backwards; animation-delay: calc(var(--i, 0) * 45ms);
+    transition: border-color .3s, box-shadow .4s, transform .4s var(--spring), opacity .3s; }
+  .card:hover { border-color: rgb(var(--glow-rgb) / .3); box-shadow: 0 0 22px rgb(var(--glow-rgb) / calc(.12 * var(--fx))); }
+  .card.col { flex-direction: column; align-items: stretch; gap: 12px; }
+  .card .l { flex: 1; min-width: 0; }
+  /* shared.css gives .t a 64px width and muted colour for the History time column; undo that here */
+  .card .t { width: auto; flex: none; font-size: 15px; color: var(--text); }
+  .card .d { color: var(--muted); font-size: 12px; margin-top: 3px; line-height: 1.45; }
+  .card.hide { display: none; }
+  select { min-width: 190px; }
+  .sw { position: relative; width: 52px; height: 30px; flex: none; cursor: pointer; }
+  .sw input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .sw span { position: absolute; inset: 0; border-radius: 15px; border: 1px solid var(--border); background: var(--surface2); transition: background .4s, border-color .4s, box-shadow .4s; }
+  .sw span::after { content: ""; position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .5s var(--spring), background .3s, box-shadow .4s; }
+  .sw input:checked + span { background: rgb(var(--glow-rgb) / .28); border-color: rgb(var(--glow-rgb) / .7); box-shadow: 0 0 14px rgb(var(--glow-rgb) / calc(.4 * var(--fx))); }
+  .sw input:checked + span::after { transform: translateX(22px); background: var(--accent-soft); box-shadow: none; }
+  .sw input:active + span::after { width: 26px; }
+  .sw input:checked:active + span::after { transform: translateX(16px); }
+  input[type=text].wide { width: 320px; max-width: 100%; }
+
+  .list { display: flex; flex-direction: column; gap: 4px; }
+  .li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 10px; background: rgb(var(--ov) / .03); font-size: 13px; animation: rowIn .45s var(--expo) backwards; }
+  .li .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .li .muted { color: var(--muted); font-size: 12px; }
+  .badge { font-size: 11px; padding: 2px 9px; border-radius: 9px; border: 1px solid var(--border); }
+  .badge.allow { color: var(--ok); border-color: rgba(155,216,167,.5); }
+  .badge.block { color: var(--bad); border-color: rgba(255,155,155,.5); }
+  .li .x { opacity: 1; }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+  .checks label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+  .checks input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .note { color: var(--warn); font-size: 12px; }
+  .ok { color: var(--ok); font-size: 13px; }
+  .btn.danger { border-color: rgb(var(--bad-rgb) / .5); color: var(--bad); }
+  .btn.danger.armed { background: rgb(var(--bad-rgb) / .2); box-shadow: 0 0 14px rgb(var(--bad-rgb) / .35); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 8px 6px; border-bottom: 1px solid var(--line); } td:first-child { color: var(--muted); width: 55%; }
+  kbd { font: 12px "Segoe UI", system-ui, sans-serif; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); margin-right: 4px; }
+  .about { display: flex; align-items: center; gap: 18px; }
+  .about svg { width: 54px; height: 54px; filter: drop-shadow(0 0 14px rgb(var(--glow-rgb) / calc(.6 * var(--fx)))); animation: spinSlow 18s linear infinite; }
+  @keyframes spinSlow { to { transform: rotate(360deg); } }
+  .results-tag { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 -4px; }
+  @media (max-width: 760px) { .wrap { flex-direction: column; } nav { position: static; width: auto; flex-direction: row; flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <h1>Settings</h1>
+    <input type="text" class="search" id="q" placeholder="Search settings" autocomplete="off">
+  </header>
+  <div class="wrap">
+    <nav id="nav"></nav>
+    <main id="main"></main>
+  </div>
+
+  <script>
+    const api = window.tidePage;
+    let S = null;
+    const $ = (id) => document.getElementById(id);
+
+    const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const save = (patch) => { Object.assign(S, patch); return api.setSettings(patch); };
+
+    // ---------- control builders ----------
+    function toggleRow(it) {
+      const sw = h('label', 'sw'); const i = h('input'); i.type = 'checkbox'; i.checked = !!S[it.key];
+      i.onchange = () => { save({ [it.key]: i.checked }); refreshVisibility(); };
+      sw.append(i, h('span'));
+      return sw;
+    }
+    function selectRow(it) {
+      const s = h('select'); s.dataset.key = it.key;
+      const opts = typeof it.options === 'function' ? it.options() : it.options;
+      for (const [v, label] of opts) { const o = h('option', '', label); o.value = v; s.appendChild(o); }
+      s.value = String(S[it.key]);
+      s.onchange = () => { save({ [it.key]: it.numeric ? Number(s.value) : s.value }); refreshVisibility(); };
+      return s;
+    }
+    function textRow(it) {
+      const t = h('input'); t.type = 'text'; t.className = 'wide'; t.placeholder = it.placeholder || ''; t.value = S[it.key] || '';
+      const commit = () => save({ [it.key]: t.value.trim() });
+      t.onchange = commit; t.onblur = commit;
+      t.addEventListener('keydown', (e) => { if (e.key === 'Enter') t.blur(); });
+      return t;
+    }
+    function buttonRow(it) {
+      const b = h('button', 'btn ' + (it.cls || ''), it.button);
+      b.onclick = () => it.action(b);
+      return b;
+    }
+
+    // ---------- custom blocks ----------
+    function clearDataBlock(card) {
+      card.classList.add('col');
+      const top = h('div'); top.append(h('div', 't', 'Clear browsing data'), h('div', 'd', 'Remove saved data from this browser. Private tabs never save any of this.'));
+      const range = h('select');
+      for (const [v, l] of [['hour', 'Last hour'], ['day', 'Last 24 hours'], ['week', 'Last 7 days'], ['month', 'Last 4 weeks'], ['all', 'All time']]) { const o = h('option', '', l); o.value = v; range.appendChild(o); }
+      range.value = 'day';
+      const checks = h('div', 'checks'); const boxes = {};
+      for (const [k, l, on] of [['history', 'Browsing history', true], ['downloads', 'Download history', true], ['cookies', 'Cookies and site data (all time, signs you out)', false], ['cache', 'Cached images and files', true]]) {
+        const lab = h('label'); const c = h('input'); c.type = 'checkbox'; c.checked = on; boxes[k] = c; lab.append(c, document.createTextNode(l)); checks.appendChild(lab);
+      }
+      const row = h('div'); row.style.cssText = 'display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+      const go = h('button', 'btn danger', 'Clear data'); const msg = h('span', 'ok');
+      let armed = false, timer;
+      go.onclick = async () => {
+        if (!armed) { armed = true; go.textContent = 'Click again to confirm'; go.classList.add('armed'); timer = setTimeout(() => { armed = false; go.textContent = 'Clear data'; go.classList.remove('armed'); }, 4000); return; }
+        clearTimeout(timer); armed = false; go.classList.remove('armed'); go.textContent = 'Clearing…';
+        await api.clearData({ range: range.value, history: boxes.history.checked, downloads: boxes.downloads.checked, cookies: boxes.cookies.checked, cache: boxes.cache.checked });
+        go.textContent = 'Clear data'; msg.textContent = 'Done.'; setTimeout(() => (msg.textContent = ''), 3000);
+      };
+      row.append(range, go, msg);
+      card.append(top, checks, row);
+    }
+
+    async function permissionsBlock(card) {
+      card.classList.add('col');
+      const top = h('div'); top.append(h('div', 't', 'Site permissions'), h('div', 'd', 'Decisions you made when a site asked for your camera, microphone, location or notifications.'));
+      const list = h('div', 'list'); const reset = h('button', 'btn', 'Reset all');
+      const load = async () => {
+        const items = await api.getPermissions(); list.textContent = '';
+        if (!items.length) list.appendChild(h('div', 'li muted', 'No saved decisions.'));
+        for (const p of items) {
+          const li = h('div', 'li'); const g = h('span', 'grow', p.origin); const m = h('span', 'muted', p.permission);
+          const b = h('span', 'badge ' + (p.allow ? 'allow' : 'block'), p.allow ? 'Allowed' : 'Blocked');
+          const x = h('button', 'x', '✕'); x.title = 'Forget this decision'; x.onclick = async () => { await api.removePermission(p.key); load(); };
+          li.append(g, m, b, x); list.appendChild(li);
+        }
+      };
+      reset.onclick = async () => { await api.resetPermissions(); load(); };
+      card.append(top, list, reset); load();
+    }
+
+    async function zoomBlock(card) {
+      card.classList.add('col');
+      const top = h('div'); top.append(h('div', 't', 'Zoom levels'), h('div', 'd', 'Tide remembers your zoom for each site. Change zoom with Ctrl +, Ctrl − and Ctrl 0.'));
+      const list = h('div', 'list'); const reset = h('button', 'btn', 'Reset all to 100%');
+      const load = async () => {
+        const items = await api.getZoomSites(); list.textContent = '';
+        if (!items.length) list.appendChild(h('div', 'li muted', 'No sites have a custom zoom.'));
+        for (const z of items) { const li = h('div', 'li'); li.append(h('span', 'grow', z.host), h('span', 'badge', z.percent + '%')); list.appendChild(li); }
+      };
+      reset.onclick = async () => { await api.resetZoomSites(); load(); };
+      card.append(top, list, reset); load();
+    }
+
+    async function importBlock(card) {
+      card.classList.add('col');
+      const top = h('div'); top.append(h('div', 't', 'Import from another browser'), h('div', 'd', 'Copy your history, bookmarks and download list into Tide. Nothing is changed or deleted in the other browser.'));
+      const browsers = await api.detectBrowsers();
+      const FILES = 'files';
+      const bsel = h('select'); const psel = h('select');
+      for (const b of browsers) { const o = h('option', '', b.name); o.value = b.id; bsel.appendChild(o); }
+      const of = h('option', '', 'Safari or another browser (from files)'); of.value = FILES; bsel.appendChild(of);
+
+      const checks = h('div', 'checks'); const boxes = {};
+      for (const [k, l] of [['history', 'Browsing history'], ['bookmarks', 'Bookmarks'], ['downloads', 'Download history']]) {
+        const lab = h('label'); const c = h('input'); c.type = 'checkbox'; c.checked = k !== 'downloads'; boxes[k] = c; lab.append(c, document.createTextNode(l)); lab._box = c; checks.appendChild(lab); boxes[k + 'Label'] = lab;
+      }
+      const filesHelp = h('div', 'd', 'Safari is not available on Windows, so bring its data over from a Mac. In Safari choose File > Export > Bookmarks, and copy ~/Library/Safari/History.db for history. Then pick one or both files here. A bookmarks .html file from any browser works too.');
+      const row = h('div'); row.style.cssText = 'display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+      const go = h('button', 'btn', 'Import'); const msg = h('div', 'ok'); const err = h('div', 'note');
+      const note = h('div', 'd', 'Not imported: passwords, cookies, extensions and open tabs. Tide has no password manager, and browsers lock cookies and passwords to their own app, so other programs cannot copy them.');
+      if (!browsers.length) top.appendChild(h('div', 'd', 'No Chrome, Edge, Brave or Firefox profile was found on this PC.'));
+
+      const sync = () => {
+        const isFiles = bsel.value === FILES;
+        const b = browsers.find((x) => x.id === bsel.value);
+        psel.textContent = '';
+        if (b) for (const p of b.profiles) { const o = h('option', '', p.name); o.value = p.id; psel.appendChild(o); }
+        psel.style.display = !isFiles && b && b.profiles.length > 1 ? '' : 'none';
+        checks.style.display = isFiles ? 'none' : '';
+        filesHelp.style.display = isFiles ? '' : 'none';
+        const prof = b && b.profiles.find((p) => p.id === psel.value);
+        for (const k of ['history', 'bookmarks', 'downloads']) {
+          const ok = !prof || prof[k];
+          boxes[k + 'Label'].style.display = ok ? '' : 'none';
+        }
+        go.textContent = isFiles ? 'Choose files…' : 'Import';
+        msg.textContent = ''; err.textContent = '';
+      };
+      bsel.onchange = sync; psel.onchange = sync;
+
+      const report = (r) => {
+        if (!r) return;
+        const parts = [];
+        if (r.history) parts.push(`${r.history.toLocaleString()} history entries`);
+        if (r.bookmarks) parts.push(`${r.bookmarks.toLocaleString()} bookmarks`);
+        if (r.downloads) parts.push(`${r.downloads.toLocaleString()} downloads`);
+        msg.textContent = parts.length ? `Imported ${parts.join(', ')}.` : (r.errors.length ? '' : 'Nothing new to import. Everything was already here.');
+        err.textContent = r.errors.join(' ');
+      };
+      go.onclick = async () => {
+        msg.textContent = ''; err.textContent = '';
+        go.disabled = true;
+        try {
+          if (bsel.value === FILES) report(await api.importFiles());
+          else report(await api.importData({ browser: bsel.value, profile: psel.value, history: boxes.history.checked, bookmarks: boxes.bookmarks.checked, downloads: boxes.downloads.checked }));
+        } finally { go.disabled = false; }
+      };
+      row.append(go);
+      card.append(top, bsel, psel, checks, filesHelp, row, msg, err, note);
+      bsel.style.maxWidth = '320px'; psel.style.maxWidth = '320px';
+      sync();
+    }
+
+    async function vtBlock(card) {
+      card.classList.add('col');
+      const top = h('div'); top.append(h('div', 't', 'VirusTotal check for downloads'), h('div', 'd', 'Tide always works out each download\'s SHA-256 fingerprint and shows it on the Downloads page. If you add your own free VirusTotal API key, Tide also asks VirusTotal whether security engines flag that fingerprint. Only the fingerprint is sent, never the file.'));
+      const row = h('div'); row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+      const inp = h('input'); inp.type = 'password'; inp.className = 'wide'; inp.placeholder = 'Paste your VirusTotal API key'; inp.autocomplete = 'off';
+      const save2 = h('button', 'btn', 'Save key'); const rm = h('button', 'btn', 'Remove key'); const msg = h('span', 'ok');
+      const st = await api.vtStatus();
+      const paint = (set) => { rm.style.display = set ? '' : 'none'; inp.placeholder = set ? 'A key is saved. Paste a new one to replace it' : 'Paste your VirusTotal API key'; };
+      paint(st.set);
+      save2.onclick = async () => {
+        msg.textContent = ''; msg.className = 'ok';
+        const r = await api.setVtKey(inp.value);
+        if (r && r.ok) { inp.value = ''; msg.textContent = 'Saved.'; paint(true); } else { msg.className = 'note'; msg.textContent = (r && r.error) || 'Could not save.'; }
+      };
+      rm.onclick = async () => { await api.setVtKey(''); msg.className = 'ok'; msg.textContent = 'Removed.'; paint(false); };
+      row.append(inp, save2, rm, msg);
+      card.append(top, row);
+    }
+
+    async function protectionsBlock(card) {
+      card.classList.add('col');
+      const info = await api.securityInfo();
+      const top = h('div'); top.append(h('div', 't', 'Protections built into Tide'), h('div', 'd', 'These are always on and have no switch.'));
+      const tb = h('table');
+      const when = info.malwareUpdated ? new Date(info.malwareUpdated).toLocaleString() : 'not downloaded yet';
+      for (const [k, v] of [
+        ['Page isolation', 'Every site runs in a sandboxed process with no access to your files or to Tide itself.'],
+        ['Certificate checks', 'Sites with an invalid or untrusted certificate are blocked behind a warning.'],
+        ['Network address privacy', 'WebRTC will not reveal your local network addresses to websites.'],
+        ['External app protection', 'A page cannot launch other programs. Risky Windows link types are blocked and the rest ask first.'],
+        ['Download safety', 'Downloads are marked as coming from the internet so Windows SmartScreen checks them, and risky file types ask before opening.'],
+        ['Vault encryption', 'AES-256-GCM with a key made from your master password using scrypt. The vault file never contains a readable password.'],
+        ['Malware site list', `${info.malwareHosts.toLocaleString()} known dangerous hosts, last updated ${when}.`],
+        ['Browser engine', `Chromium ${info.chromium}. Install Tide updates promptly, because Chromium security fixes ship through them.`],
+      ]) { const tr = h('tr'); tr.append(h('td', '', k), h('td', '', v)); tb.appendChild(tr); }
+      card.append(top, tb);
+    }
+
+    function downloadDirBlock(card) {
+      const l = h('div', 'l'); const t = h('div', 't', 'Download location'); const d = h('div', 'd'); l.append(t, d);
+      const show = () => (d.textContent = S.downloadDir || (S.meta.defaultDownloads + '  (default)'));
+      show();
+      const change = h('button', 'btn', 'Change…'); change.onclick = async () => { S.downloadDir = await api.chooseDownloadDir(); show(); };
+      const reset = h('button', 'btn', 'Reset'); reset.onclick = async () => { S.downloadDir = await api.resetDownloadDir(); show(); };
+      card.append(l, change, reset);
+    }
+
+    async function extensionsBlock(card) {
+      card.classList.add('col');
+      const top = h('div'); top.append(h('div', 't', 'Unpacked extensions'), h('div', 'd', 'Load a Chrome extension from a folder on your computer. Experimental: Tide supports only part of the Chrome extension API, so some extensions will not work, and extension buttons and popups are not shown.'));
+      const list = h('div', 'list'); const add = h('button', 'btn', 'Load unpacked extension…'); const err = h('div', 'note');
+      const draw = (items) => {
+        list.textContent = '';
+        if (!items.length) list.appendChild(h('div', 'li muted', 'No extensions loaded.'));
+        for (const x of items) {
+          const li = h('div', 'li'); li.append(h('span', 'grow', `${x.name || 'Extension'}  ${x.version || ''}`), h('span', 'muted', x.path));
+          const rm = h('button', 'x', '✕'); rm.title = 'Remove'; rm.onclick = async () => draw(await api.removeExtension(x.path)); li.appendChild(rm); list.appendChild(li);
+        }
+      };
+      add.onclick = async () => { err.textContent = ''; const r = await api.addExtension(); if (r && r.error) err.textContent = r.error; draw((r && r.list) || []); };
+      card.append(top, list, add, err); draw(await api.getExtensions());
+    }
+
+    function shortcutsBlock(card) {
+      card.classList.add('col');
+      const rows = [
+        ['New tab', 'Ctrl T'], ['New private tab', 'Ctrl Shift N'], ['Close tab', 'Ctrl W'], ['Reopen closed tab', 'Ctrl Shift T'],
+        ['Next / previous tab', 'Ctrl Tab / Ctrl Shift Tab'], ['Go to tab 1 to 8', 'Ctrl 1 to 8'], ['Go to the last tab', 'Ctrl 9'],
+        ['Focus address bar', 'Ctrl L, Alt D or F6'], ['Back / forward', 'Alt ← / Alt →'], ['Reload', 'F5 or Ctrl R'], ['Hard reload', 'Ctrl Shift R'],
+        ['Find in page', 'Ctrl F'], ['Bookmark this page', 'Ctrl D'], ['Show or hide bookmarks bar', 'Ctrl Shift B'], ['History', 'Ctrl H'],
+        ['Settings', 'Ctrl ,'], ['Clear browsing data', 'Ctrl Shift Delete'], ['Save page as', 'Ctrl S'], ['Open file', 'Ctrl O'], ['Print', 'Ctrl P'],
+        ['Zoom in / out / reset', 'Ctrl + / Ctrl − / Ctrl 0'], ['Full screen', 'F11'], ['Developer tools', 'F12 or Ctrl Shift I'], ['View page source', 'Ctrl U'], ['Quit', 'Ctrl Shift Q'],
+      ];
+      const tb = h('table');
+      for (const [a, k] of rows) { const tr = h('tr'); const td2 = h('td'); k.split(' ').forEach((p) => { if (p === '/' || p === 'or' || p === ',' || p === 'to') td2.appendChild(document.createTextNode(` ${p} `)); else td2.appendChild(h('kbd', '', p)); }); tr.append(h('td', '', a), td2); tb.appendChild(tr); }
+      card.appendChild(tb);
+    }
+
+    async function updateBlock(card) {
+      card.classList.add('col');
+      const top = h('div'); top.append(h('div', 't', 'Software updates'), h('div', 'd', 'Tide checks for updates in the background, downloads them quietly, and installs them when you restart. Updates are checked against a fingerprint before they are installed.'));
+      const line = h('div'); line.style.cssText = 'display:flex;gap:12px;align-items:center;flex-wrap:wrap';
+      const msg = h('span', 'ok'); const check = h('button', 'btn', 'Check for updates'); const inst = h('button', 'btn pri2', 'Restart to update');
+      inst.style.cssText = 'background:var(--accent-bg);border-color:var(--accent-line);color:var(--on-accent);display:none';
+      line.append(check, inst, msg);
+      const paint = (u) => {
+        inst.style.display = u.status === 'ready' ? '' : 'none';
+        check.disabled = !u.supported || ['checking', 'downloading', 'ready'].includes(u.status);
+        msg.className = u.status === 'error' && u.kind !== 'nofeed' ? 'note' : 'ok';
+        const t = { unsupported: 'Updates work in the installed app.', idle: `You have Tide ${u.current}.`, checking: 'Checking…', none: `Tide ${u.current} is the latest version.`,
+          downloading: `Downloading Tide ${u.version}… ${u.percent}%`, ready: `Tide ${u.version} is ready.`, error: u.kind === 'nofeed' ? `${u.error} You have Tide ${u.current}.` : u.error }[u.status];
+        msg.textContent = t || '';
+      };
+      let timer;
+      const poll = async () => { const u = await api.updateStatus(); paint(u); clearTimeout(timer); if (['checking', 'downloading'].includes(u.status)) timer = setTimeout(poll, 700); };
+      check.onclick = async () => { paint(await api.updateCheck()); setTimeout(poll, 500); };
+      inst.onclick = () => { inst.disabled = true; inst.textContent = 'Restarting…'; api.updateInstall(); };
+      card.append(top, line); poll();
+    }
+
+    function aboutBlock(card) {
+      card.classList.add('col');
+      const top = h('div', 'about');
+      top.innerHTML = '<svg viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--accent-soft)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs><mask id="tm"><rect width="100" height="100" fill="#fff"/><path d="M0 57q12.5-12 25 0t25 0t25 0t25 0" fill="none" stroke="#000" stroke-width="6.5"/><path d="M0 75q12.5 12 25 0t25 0t25 0t25 0" fill="none" stroke="#000" stroke-width="6.5"/></mask><circle cx="50" cy="50" r="46" fill="url(#g)" mask="url(#tm)"/></svg>';
+      const info = h('div'); info.append(h('div', 't', 'Tide Browser'), h('div', 'd', `Version ${S.meta.version} · Browse beyond`)); top.appendChild(info);
+      const tb = h('table');
+      for (const [k, v] of [['Chromium', S.meta.versions.chromium], ['Electron', S.meta.versions.electron], ['V8', S.meta.versions.v8], ['Node.js', S.meta.versions.node], ['Profile folder', S.meta.userData]]) {
+        const tr = h('tr'); tr.append(h('td', '', k), h('td', '', v)); tb.appendChild(tr);
+      }
+      card.append(top, tb);
+    }
+
+    // ---------- definitions ----------
+    const SECTIONS = [
+      { id: 'general', title: 'General', lead: 'Startup and tab behavior.', items: [
+        { type: 'select', key: 'startup', label: 'On startup', desc: 'What Tide opens when you launch it. Pinned tabs always come back.',
+          options: [['newtab', 'Open the New Tab page'], ['continue', 'Continue where I left off'], ['custom', 'Open a specific page']] },
+        { type: 'text', key: 'startupUrl', label: 'Startup page', desc: 'Tide opens this page on startup when "Open a specific page" is selected.', placeholder: 'https://example.com', showIf: () => S.startup === 'custom' },
+        { type: 'toggle', key: 'bookmarksBar', label: 'Show bookmarks bar', desc: 'Shows your bookmarks in a row under the toolbar. Shortcut: Ctrl+Shift+B.' },
+        { type: 'button', label: 'Default browser', desc: 'Open Windows settings to make Tide the browser that opens links.', button: 'Open Windows settings', action: () => api.openDefaultApps() },
+      ] },
+      { id: 'appearance', title: 'Appearance', lead: 'Theme and animation.', items: [
+        { type: 'select', key: 'theme', label: 'Theme', desc: 'Light or dark for Tide and for websites that support both. The sun and moon button in the left menu switches it too.',
+          options: [['dark', 'Dark'], ['light', 'Light'], ['system', 'Match Windows']] },
+        { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', desc: 'Turns off most animations, including the launch sequence. Tide also follows the Windows "Show animations" setting.' },
+      ] },
+      { id: 'search', title: 'Search', lead: 'What the address bar searches with.', items: [
+        { type: 'select', key: 'searchEngine', label: 'Search engine', desc: 'Used when you type something that is not a web address.', options: () => Object.entries(S.meta.engines) },
+        { type: 'toggle', key: 'searchSuggestions', label: 'Search suggestions', desc: 'Show live suggestions from your search engine as you type. This sends what you type in the address bar to that engine. History, bookmarks and open tabs are always suggested locally.' },
+      ] },
+      { id: 'privacy', title: 'Privacy and security', lead: 'What sites and trackers can see and store.', items: [
+        { type: 'toggle', key: 'blockAds', label: 'Block ads and trackers', desc: 'Stops requests to a built-in list of well-known ad and tracking domains. The shield in the address bar shows how many were blocked.' },
+        { type: 'toggle', key: 'httpsOnly', label: 'Always use secure connections', desc: 'Upgrade http:// pages to https://. Sites that do not support HTTPS will fail to load.' },
+        { type: 'toggle', key: 'sendGpc', label: 'Send "Do Not Track" and Global Privacy Control', desc: 'Asks sites not to sell or share your data. Sites can ignore the request.' },
+        { type: 'toggle', key: 'blockThirdPartyCookies', label: 'Block third-party cookies', desc: 'Stops cookies from sites other than the one you are visiting. Estimated by domain name, so a few sites that use several domains to sign you in may break.' },
+        { type: 'custom', render: clearDataBlock },
+        { type: 'custom', render: permissionsBlock },
+        { type: 'custom', render: zoomBlock },
+      ] },
+      { id: 'security', title: 'Security', lead: 'Passwords, dangerous sites and encrypted lookups.', items: [
+        { type: 'button', label: 'Password manager', desc: 'Encrypted with your master password. Tide never fills a login unless you ask, and only on the site it was saved for.', button: 'Open passwords', action: () => api.navigate('browser://passwords') },
+        { type: 'toggle', key: 'pwPrompts', label: 'Offer to save passwords', desc: 'After you sign in to a site, ask whether to save the password. Private tabs never ask.' },
+        { type: 'toggle', key: 'warnDangerous', label: 'Warn about dangerous sites', desc: 'Show a warning before opening a site on a public malware list. Tide downloads the list every 12 hours and never sends your browsing to anyone to check it.' },
+        { type: 'toggle', key: 'stripTracking', label: 'Remove tracking from links', desc: 'Strips parameters such as utm_source, fbclid and gclid from addresses you open.' },
+        { type: 'select', key: 'secureDns', label: 'Secure DNS', desc: 'Encrypts website lookups so your network cannot read or change them. Choose a provider, or turn it off to use your system DNS.',
+          options: [['off', 'Off (use system DNS)'], ['cloudflare', 'Cloudflare'], ['google', 'Google'], ['quad9', 'Quad9']] },
+        { type: 'toggle', key: 'clearOnExit', label: 'Delete cookies and site data when Tide closes', desc: 'You will be signed out of websites every time you quit.' },
+        { type: 'custom', render: vtBlock },
+        { type: 'custom', render: protectionsBlock },
+      ] },
+      { id: 'tide', title: 'Tide tools', lead: 'Recall, Orbits, link previews and snapshots.', items: [
+        { type: 'toggle', key: 'recallEnabled', label: 'Recall', desc: 'Keep a private, encrypted copy of the text of pages you read, so you can search them later by what they said. Private tabs, login pages and banking, health and tax sites are never saved.' },
+        { type: 'text', key: 'recallExclude', label: 'Sites Recall never saves', desc: 'Separate sites with commas. Subdomains are included.', placeholder: 'example.com, other.org' },
+        { type: 'button', label: 'Search your Recall', desc: 'Open the page where you search everything you have read.', button: 'Open Recall', action: () => api.navigate('browser://recall') },
+        { type: 'select', key: 'orbitMinutes', numeric: true, label: 'Move unused tabs to Orbits after', desc: 'Tabs you have not looked at for this long leave the tab strip and wait in Orbits. Pinned, playing and private tabs stay.',
+          options: [[0, 'Never'], [60, '1 hour'], [240, '4 hours'], [480, '8 hours'], [1440, '1 day'], [4320, '3 days']] },
+        { type: 'toggle', key: 'peekEnabled', label: 'Link preview', desc: 'Hold the mouse button on a link, or Alt+click it, to preview the page in a floating window.' },
+        { type: 'toggle', key: 'snapshotsAuto', label: 'Automatic session snapshots', desc: 'Save your open tabs every 30 minutes and when you quit, so you can go back to an earlier session.' },
+        { type: 'button', label: 'Everything else', desc: 'Focus mode, Trail, Constellations and Snapshots live on the Explore page.', button: 'Open Explore', action: () => api.navigate('browser://explore') },
+      ] },
+      { id: 'import', title: 'Import data', lead: 'Bring history and bookmarks from another browser.', items: [{ type: 'custom', render: importBlock }] },
+      { id: 'downloads', title: 'Downloads', lead: 'Where downloads are saved.', items: [
+        { type: 'custom', render: downloadDirBlock },
+        { type: 'toggle', key: 'askDownload', label: 'Ask where to save each file', desc: 'Show a Save As window for every download.' },
+        { type: 'button', label: 'Download manager', desc: 'See, pause, resume and open your downloads.', button: 'Open downloads', action: () => api.navigate('browser://downloads') },
+      ] },
+      { id: 'languages', title: 'Languages', lead: 'Spell checking while you type.', items: [
+        { type: 'toggle', key: 'spellcheck', label: 'Check spelling', desc: 'Underline misspelled words in text boxes.' },
+        { type: 'select', key: 'spellLang', label: 'Spelling language', desc: 'The dictionary may download the first time you use it.',
+          options: () => { const l = (S.meta.spellLangs || []).slice().sort(); return (l.length ? l : ['en-US']).map((x) => [x, x]); }, showIf: () => S.spellcheck },
+      ] },
+      { id: 'extensions', title: 'Extensions', lead: 'Experimental.', tag: 'Experimental', items: [{ type: 'custom', render: extensionsBlock }] },
+      { id: 'system', title: 'System', lead: 'Hardware acceleration and restart.', items: [
+        { type: 'toggle', key: 'hardwareAccel', label: 'Use hardware acceleration when available', desc: 'Turn this off if you see graphics glitches. Takes effect after a restart.' },
+        { type: 'button', label: 'Restart Tide', desc: 'Hardware acceleration changes need a restart. Tide restores your tabs if "Continue where I left off" is selected.', button: 'Restart now', action: () => api.relaunch() },
+      ] },
+      { id: 'shortcuts', title: 'Keyboard shortcuts', lead: 'Keys for common actions.', items: [{ type: 'custom', render: shortcutsBlock }] },
+      { id: 'about', title: 'About Tide', lead: '', items: [{ type: 'custom', render: updateBlock }, { type: 'custom', render: aboutBlock }] },
+    ];
+
+    function buildCard(it, i) {
+      const card = h('div', 'card'); card.style.setProperty('--i', i);
+      if (it.type === 'custom') { it.render(card); return card; }
+      const l = h('div', 'l'); l.append(h('div', 't', it.label), h('div', 'd', it.desc || '')); card.appendChild(l);
+      card.appendChild({ toggle: toggleRow, select: selectRow, text: textRow, button: buttonRow }[it.type](it));
+      return card;
+    }
+    function refreshVisibility() {
+      document.querySelectorAll('.card[data-show]').forEach((c) => { c._it && c.classList.toggle('hide', !c._it.showIf()); });
+    }
+    function renderCard(it, i) {
+      const c = buildCard(it, i);
+      if (it.showIf) { c._it = it; c.dataset.show = '1'; c.classList.toggle('hide', !it.showIf()); }
+      return c;
+    }
+
+    let current = 'general';
+    function showSection(id, push = true) {
+      const sec = SECTIONS.find((s) => s.id === id) || SECTIONS[0];
+      current = sec.id;
+      document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.id === sec.id));
+      const main = $('main'); main.textContent = '';
+      const box = h('div', 'sec');
+      const title = h('h2', '', sec.title); if (sec.tag) title.appendChild(h('span', 'tag', sec.tag));
+      box.append(title); if (sec.lead) box.appendChild(h('p', 'lead', sec.lead));
+      sec.items.forEach((it, i) => box.appendChild(renderCard(it, i)));
+      main.appendChild(box);
+      if (push && location.hash !== '#' + sec.id) history.replaceState(null, '', '#' + sec.id);
+    }
+
+    function search(q) {
+      const main = $('main'); main.textContent = '';
+      const box = h('div', 'sec'); let n = 0;
+      for (const sec of SECTIONS) {
+        const hits = sec.items.filter((it) => it.type !== 'custom' && (`${it.label} ${it.desc}`).toLowerCase().includes(q));
+        if (!hits.length) continue;
+        box.appendChild(h('div', 'results-tag', sec.title));
+        hits.forEach((it) => box.appendChild(renderCard(it, n++)));
+      }
+      if (!n) box.appendChild(h('div', 'empty', 'No settings match "' + q + '".'));
+      main.appendChild(box);
+      document.querySelectorAll('#nav button').forEach((b) => b.classList.remove('on'));
+    }
+
+    api.getSettings().then((s) => {
+      S = s;
+      const nav = $('nav');
+      for (const sec of SECTIONS) { const b = h('button', '', sec.title); b.dataset.id = sec.id; b.onclick = () => { $('q').value = ''; showSection(sec.id); }; nav.appendChild(b); }
+      showSection((location.hash || '').slice(1) || 'general', false);
+      // The sidebar button can change the theme while this page is open, so keep the dropdown in step.
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', async () => {
+        const fresh = await api.getSettings();
+        S.theme = fresh.theme;
+        const el = document.querySelector('select[data-key="theme"]');
+        if (el) el.value = fresh.theme;
+      });
+      $('q').addEventListener('input', () => { const q = $('q').value.trim().toLowerCase(); if (q) search(q); else showSection(current); });
+      addEventListener('hashchange', () => { const id = location.hash.slice(1); if (SECTIONS.some((x) => x.id === id) && id !== current) { $('q').value = ''; showSection(id, false); } });
+    });
+  </script>
+</body>
+</html>
