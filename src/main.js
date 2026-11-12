@@ -11,7 +11,9 @@ const { SafeBrowsing } = require('./safebrowsing');
 const { Recall } = require('./recall');
 const features = require('./features');
 const updater = require('./updater');
+const IS_MAC = process.platform === 'darwin';
 let fx = null; // Tide feature hooks (features.js), created once the app is ready
+let pendingOpenUrl = null; // a link macOS handed us before the window existed
 
 // ======================================================================
 // Persistence
@@ -168,7 +170,9 @@ let splashView = null; // full-window overlay that plays the paint-splash theme 
 const splash = { ready: null, done: null, running: false };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const DANGEROUS_EXT = new Set(['.exe', '.msi', '.bat', '.cmd', '.com', '.scr', '.ps1', '.psm1', '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.jar',
-  '.lnk', '.hta', '.reg', '.cpl', '.msc', '.dll', '.msp', '.apk', '.appx', '.msix', '.iso', '.img', '.vhd', '.docm', '.xlsm', '.pptm']);
+  '.lnk', '.hta', '.reg', '.cpl', '.msc', '.dll', '.msp', '.apk', '.appx', '.msix', '.iso', '.img', '.vhd', '.docm', '.xlsm', '.pptm',
+  // macOS
+  '.app', '.dmg', '.pkg', '.mpkg', '.command', '.terminal', '.sh', '.scpt', '.scptd', '.workflow', '.action', '.osax', '.webloc', '.inetloc', '.jnlp', '.dylib']);
 const DNS_SERVERS = {
   cloudflare: ['https://cloudflare-dns.com/dns-query'],
   google: ['https://dns.google/dns-query'],
@@ -310,7 +314,7 @@ function paintWindowChrome() {
   const c = themeColors();
   try {
     win.setBackgroundColor(c.bg);
-    win.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: 44 });
+    if (!IS_MAC) win.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: 44 });
     if (ui) ui.setBackgroundColor(c.bg);
   } catch { /* window closing */ }
 }
@@ -1037,7 +1041,15 @@ function configureSession(ses, isPrivate) {
 }
 
 function markFromInternet(file, url) {
-  if (process.platform !== 'win32' || !file) return;
+  if (!file) return;
+  if (IS_MAC) {
+    // Quarantine flag: Gatekeeper checks the file the first time it is opened. Format is flags;hex time;app name;.
+    try {
+      require('child_process').execFile('/usr/bin/xattr', ['-w', 'com.apple.quarantine', `0083;${Math.floor(Date.now() / 1000).toString(16)};Tide;`, file], () => {});
+    } catch { /* xattr not available */ }
+    return;
+  }
+  if (process.platform !== 'win32') return;
   try {
     const host = /^https?:/i.test(url) ? `HostUrl=${url.slice(0, 1000)}\r\n` : '';
     fs.writeFileSync(`${file}:Zone.Identifier`, `[ZoneTransfer]\r\nZoneId=3\r\n${host}`);
@@ -1422,8 +1434,10 @@ function createWindow() {
     minHeight: 480, // the sidebar needs this much room for all its buttons
     backgroundColor: themeColors().bg,
     title: 'Tide Browser',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: { color: themeColors().bg, symbolColor: themeColors().fg, height: 44 },
+    // Windows draws its own caption buttons over the tab strip. macOS keeps its traffic lights, set inside the strip.
+    ...(IS_MAC
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 15 } }
+      : { titleBarStyle: 'hidden', titleBarOverlay: { color: themeColors().bg, symbolColor: themeColors().fg, height: 44 } }),
     show: false,
   });
   if (ws.maximized) win.maximize();
@@ -1460,7 +1474,9 @@ function createWindow() {
     try { win.setOpacity(0); } catch { /* unsupported */ }
     win.show();
     fadeWindowIn();
-    openStartupTabs(process.argv.slice(app.isPackaged ? 1 : 2).find((a) => /^https?:\/\//i.test(a)));
+    const openAt = pendingOpenUrl;
+    pendingOpenUrl = null;
+    openStartupTabs(openAt || process.argv.slice(app.isPackaged ? 1 : 2).find((a) => /^https?:\/\//i.test(a)));
   });
 }
 
@@ -1584,32 +1600,32 @@ ipcMain.handle('ui:ready', guardUi(() => { sendState(); }));
 ipcMain.handle('menu:main', guardUi((x, y) => {
   const wc = () => activeTab() && tabWc(activeTab());
   Menu.buildFromTemplate([
-    { label: 'New tab', accelerator: 'Ctrl+T', click: () => createTab(NEWTAB_URL) },
-    { label: 'New private tab', accelerator: 'Ctrl+Shift+N', click: () => openPrivateTab() },
-    { label: 'Reopen closed tab', accelerator: 'Ctrl+Shift+T', enabled: closedStack.length > 0, click: reopenClosed },
+    { label: 'New tab', accelerator: 'CommandOrControl+T', click: () => createTab(NEWTAB_URL) },
+    { label: 'New private tab', accelerator: 'CommandOrControl+Shift+N', click: () => openPrivateTab() },
+    { label: 'Reopen closed tab', accelerator: 'CommandOrControl+Shift+T', enabled: closedStack.length > 0, click: reopenClosed },
     { type: 'separator' },
     ...(updater.status().status === 'ready' ? [{ label: `Restart to update to Tide ${updater.status().version}`, click: () => updater.install() }, { type: 'separator' }] : []),
     ...(fx ? fx.kebabItems() : []),
     { type: 'separator' },
     { label: 'Bookmarks', click: () => createTab(INTERNAL.bookmarks) },
-    { label: 'History', accelerator: 'Ctrl+H', click: () => createTab(INTERNAL.history) },
+    { label: 'History', accelerator: 'CommandOrControl+H', click: () => createTab(INTERNAL.history) },
     { label: 'Downloads', click: () => createTab(INTERNAL.downloads) },
-    { label: 'Show bookmarks bar', type: 'checkbox', checked: settings.bookmarksBar, accelerator: 'Ctrl+Shift+B', click: (i) => setBookmarksBar(i.checked) },
-    { label: 'Clear browsing data…', accelerator: 'Ctrl+Shift+Delete', click: () => createTab(`${INTERNAL.settings}#privacy`) },
+    { label: 'Show bookmarks bar', type: 'checkbox', checked: settings.bookmarksBar, accelerator: 'CommandOrControl+Shift+B', click: (i) => setBookmarksBar(i.checked) },
+    { label: 'Clear browsing data…', accelerator: 'CommandOrControl+Shift+Delete', click: () => createTab(`${INTERNAL.settings}#privacy`) },
     { label: 'Passwords', click: () => createTab(INTERNAL.passwords) },
     { label: 'Import data from another browser…', click: () => createTab(`${INTERNAL.settings}#import`) },
     { type: 'separator' },
-    { label: 'Zoom in', accelerator: 'Ctrl+Plus', click: () => zoom(0.5) },
-    { label: 'Zoom out', accelerator: 'Ctrl+-', click: () => zoom(-0.5) },
-    { label: 'Reset zoom', accelerator: 'Ctrl+0', click: () => zoom(0) },
+    { label: 'Zoom in', accelerator: 'CommandOrControl+Plus', click: () => zoom(0.5) },
+    { label: 'Zoom out', accelerator: 'CommandOrControl+-', click: () => zoom(-0.5) },
+    { label: 'Reset zoom', accelerator: 'CommandOrControl+0', click: () => zoom(0) },
     { type: 'separator' },
-    { label: 'Save page as…', accelerator: 'Ctrl+S', click: savePage },
+    { label: 'Save page as…', accelerator: 'CommandOrControl+S', click: savePage },
     { label: 'Save as PDF…', click: savePdf },
-    { label: 'Print…', accelerator: 'Ctrl+P', click: () => wc()?.print() },
-    { label: 'Find in page', accelerator: 'Ctrl+F', click: () => { ui.webContents.focus(); ui.webContents.send('find-open'); } },
+    { label: 'Print…', accelerator: 'CommandOrControl+P', click: () => wc()?.print() },
+    { label: 'Find in page', accelerator: 'CommandOrControl+F', click: () => { ui.webContents.focus(); ui.webContents.send('find-open'); } },
     { label: 'Developer tools', accelerator: 'F12', click: () => wc()?.toggleDevTools() },
     { type: 'separator' },
-    { label: 'Settings', accelerator: 'Ctrl+,', click: () => createTab(INTERNAL.settings) },
+    { label: 'Settings', accelerator: 'CommandOrControl+,', click: () => createTab(INTERNAL.settings) },
     { label: 'Quit Tide', click: () => app.quit() },
   ]).popup({ window: win, x: Math.round(x), y: Math.round(y) });
 }));
@@ -1731,7 +1747,14 @@ handleInternal('setSettings', (_e, patch) => {
 handleInternal('getShortcuts', () => settings.shortcuts || null);
 handleInternal('navigate', (e, raw) => { e.sender.loadURL(normalizeInput(raw)); });
 handleInternal('relaunch', () => { flushSaves(); app.relaunch(); app.exit(0); });
-handleInternal('openDefaultApps', () => shell.openExternal('ms-settings:defaultapps'));
+handleInternal('openDefaultApps', () => {
+  if (IS_MAC) {
+    // macOS asks the person to confirm in its own dialog. The settings pane is the fallback (macOS 13 and later).
+    try { app.setAsDefaultProtocolClient('http'); app.setAsDefaultProtocolClient('https'); } catch { /* ignore */ }
+    return shell.openExternal('x-apple.systempreferences:com.apple.Desktop-Settings.extension');
+  }
+  return shell.openExternal('ms-settings:defaultapps');
+});
 handleInternal('chooseDownloadDir', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });
   if (canceled || !filePaths[0]) return settings.downloadDir;
@@ -1927,7 +1950,20 @@ function buildMenu() {
     item(`Select tab ${n}`, `CommandOrControl+${n}`, () => order[n - 1] && selectTab(order[n - 1])));
   tabSelectors.push(item('Select last tab', 'CommandOrControl+9', () => selectTab(order[order.length - 1])));
 
+  // macOS conventions: Cmd+[ and Cmd+] for back and forward, Cmd+Y for history (Cmd+H hides the app), Ctrl+Tab for
+  // the next tab (Cmd+Tab belongs to the system), Option+Cmd+I for developer tools, and a Tide menu holding Settings and Quit.
+  const macAppMenu = IS_MAC ? [{
+    label: app.name,
+    submenu: [
+      { role: 'about' }, { type: 'separator' },
+      item('Settings…', 'Command+,', () => createTab(INTERNAL.settings)),
+      { type: 'separator' }, { role: 'services' }, { type: 'separator' },
+      { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' },
+    ],
+  }] : [];
+
   Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...macAppMenu,
     {
       label: 'File',
       submenu: [
@@ -1938,7 +1974,7 @@ function buildMenu() {
         item('Open file…', 'CommandOrControl+O', openFileDialog),
         item('Save page as…', 'CommandOrControl+S', savePage),
         item('Print…', 'CommandOrControl+P', () => wcOf()?.print()),
-        item('Quit', 'CommandOrControl+Shift+Q', () => app.quit()),
+        ...(IS_MAC ? [] : [item('Quit', 'CommandOrControl+Shift+Q', () => app.quit())]),
       ],
     },
     { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
@@ -1946,7 +1982,7 @@ function buildMenu() {
       label: 'View',
       submenu: [
         item('Focus address bar', 'CommandOrControl+L', focusOmni),
-        item('Focus address bar (alt)', 'Alt+D', focusOmni),
+        ...(IS_MAC ? [] : [item('Focus address bar (alt)', 'Alt+D', focusOmni)]), // Option+D types a symbol on a Mac
         item('Focus address bar (F6)', 'F6', focusOmni),
         item('Command bar', 'CommandOrControl+K', () => fx && fx.openCmd()),
         item('Reader view', 'F9', () => { const t = activeTab(); if (t && fx) fx.openReader(t); }),
@@ -1959,36 +1995,37 @@ function buildMenu() {
         item('Zoom out', 'CommandOrControl+-', () => zoom(-0.5)),
         item('Actual size', 'CommandOrControl+0', () => zoom(0)),
         item('Toggle bookmarks bar', 'CommandOrControl+Shift+B', () => setBookmarksBar(!settings.bookmarksBar)),
-        item('Toggle full screen', 'F11', () => win.setFullScreen(!win.isFullScreen())),
+        item('Toggle full screen', IS_MAC ? 'Control+Command+F' : 'F11', () => win.setFullScreen(!win.isFullScreen())),
         item('View source', 'CommandOrControl+U', () => { const w = wcOf(); if (w) createTab(`view-source:${w.getURL()}`, { isPrivate: activeTab().private }); }),
         item('Developer tools', 'F12', () => wcOf()?.toggleDevTools()),
-        item('Developer tools (Ctrl+Shift+I)', 'CommandOrControl+Shift+I', () => wcOf()?.toggleDevTools()),
+        item('Developer tools (alt)', IS_MAC ? 'Alt+Command+I' : 'CommandOrControl+Shift+I', () => wcOf()?.toggleDevTools()),
       ],
     },
     {
       label: 'History',
       submenu: [
-        item('Back', 'Alt+Left', () => { const h = wcOf()?.navigationHistory; if (h?.canGoBack()) h.goBack(); }),
-        item('Forward', 'Alt+Right', () => { const h = wcOf()?.navigationHistory; if (h?.canGoForward()) h.goForward(); }),
-        item('Show history', 'CommandOrControl+H', () => createTab(HISTORY_URL)),
+        item('Back', IS_MAC ? 'Command+[' : 'Alt+Left', () => { const h = wcOf()?.navigationHistory; if (h?.canGoBack()) h.goBack(); }),
+        item('Forward', IS_MAC ? 'Command+]' : 'Alt+Right', () => { const h = wcOf()?.navigationHistory; if (h?.canGoForward()) h.goForward(); }),
+        item('Show history', IS_MAC ? 'Command+Y' : 'CommandOrControl+H', () => createTab(HISTORY_URL)),
         item('Bookmark this page', 'CommandOrControl+D', toggleBookmark),
         item('Clear browsing data…', 'CommandOrControl+Shift+Delete', () => createTab(`${INTERNAL.settings}#privacy`)),
         item('Passwords', null, () => createTab(INTERNAL.passwords)),
         item('Fill saved login', 'CommandOrControl+Shift+L', passwordButton),
         item('Import data from another browser…', null, () => createTab(`${INTERNAL.settings}#import`)),
-        item('Settings', 'CommandOrControl+,', () => createTab(INTERNAL.settings)),
+        ...(IS_MAC ? [] : [item('Settings', 'CommandOrControl+,', () => createTab(INTERNAL.settings))]), // on a Mac it lives in the Tide menu
       ],
     },
     {
       label: 'Tabs',
       submenu: [
-        item('Next tab', 'CommandOrControl+Tab', () => cycleTab(1)),
-        item('Previous tab', 'CommandOrControl+Shift+Tab', () => cycleTab(-1)),
-        item('Next tab (PgDn)', 'CommandOrControl+PageDown', () => cycleTab(1)),
-        item('Previous tab (PgUp)', 'CommandOrControl+PageUp', () => cycleTab(-1)),
+        item('Next tab', IS_MAC ? 'Control+Tab' : 'CommandOrControl+Tab', () => cycleTab(1)),
+        item('Previous tab', IS_MAC ? 'Control+Shift+Tab' : 'CommandOrControl+Shift+Tab', () => cycleTab(-1)),
+        item('Next tab (alt)', IS_MAC ? 'Command+Shift+]' : 'CommandOrControl+PageDown', () => cycleTab(1)),
+        item('Previous tab (alt)', IS_MAC ? 'Command+Shift+[' : 'CommandOrControl+PageUp', () => cycleTab(-1)),
         ...tabSelectors,
       ],
     },
+    ...(IS_MAC ? [{ role: 'windowMenu' }] : []),
   ]));
 }
 
@@ -2081,7 +2118,15 @@ app.whenReady().then(async () => {
   for (const x of settings.extensions) await loadExtension(x.path);
 });
 
-app.on('window-all-closed', () => app.quit());
+// On a Mac, closing the last window leaves the app running, and clicking its Dock icon opens a new window.
+app.on('window-all-closed', () => { if (!IS_MAC) app.quit(); });
+app.on('activate', () => { if (!win && app.isReady()) createWindow(); });
+// Links from other apps arrive here on macOS (Windows passes them on the command line).
+app.on('open-url', (e, url) => {
+  e.preventDefault();
+  if (!/^https?:\/\//i.test(url)) return;
+  if (win && ui) { if (win.isMinimized()) win.restore(); win.focus(); createTab(url); } else pendingOpenUrl = url;
+});
 
 // Read-only handles used by automated tests.
 module.exports = {

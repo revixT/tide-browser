@@ -734,7 +734,7 @@ function init(ctx) {
     },
     kebabItems() {
       return [
-        { label: 'Command bar', accelerator: 'Ctrl+K', click: openCmd },
+        { label: 'Command bar', accelerator: 'CommandOrControl+K', click: openCmd },
         { label: 'Reader view', accelerator: 'F9', click: () => { const t = ctx.activeTab(); if (t) openReader(t); } },
         { label: 'Explore Tide', click: () => ctx.createTab(ctx.INTERNAL.explore) },
       ];

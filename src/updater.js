@@ -5,7 +5,13 @@
 //   - Each download is verified against the SHA-512 in latest.yml before it is installed.
 //   - In development nothing is checked, unless TIDE_UPDATE_FEED points at a test server. That variable is
 //     ignored in the installed app, so it can never be used to redirect real updates.
-const { app } = require('electron');
+const { app, shell } = require('electron');
+const fs = require('fs');
+const path = require('path');
+
+// Flip to true once the Mac build is signed and notarized with an Apple Developer ID.
+const MAC_SIGNED = false;
+const SELF_UPDATE = process.platform !== 'darwin' || MAC_SIGNED;
 
 const state = { status: 'idle', version: '', percent: 0, error: '', kind: '', checkedAt: 0 };
 
@@ -34,7 +40,9 @@ function init(opts) {
   if (!supported) { set({ status: 'unsupported' }); return; }
 
   ({ autoUpdater: updater } = require('electron-updater'));
-  updater.autoDownload = true;
+  // macOS only installs an update over a signed app. Until Tide is signed with an Apple Developer ID, a Mac
+  // copy finds new versions and opens the download page instead of installing by itself.
+  updater.autoDownload = SELF_UPDATE;
   // A test feed must never install anything onto this PC when the app closes.
   updater.autoInstallOnAppQuit = !testFeed;
   updater.allowPrerelease = false;
@@ -47,6 +55,12 @@ function init(opts) {
 
   updater.on('checking-for-update', () => set({ status: 'checking', error: '' }));
   updater.on('update-available', (info) => {
+    if (!SELF_UPDATE) {
+      set({ status: 'available', version: info.version, checkedAt: Date.now() });
+      if (hooks.toast) hooks.toast(`Tide ${info.version} is available. Open Settings > About to download it`);
+      manual = false;
+      return;
+    }
     set({ status: 'downloading', version: info.version, percent: 0 });
     if (hooks.toast) hooks.toast(`Downloading Tide ${info.version}`);
   });
@@ -73,12 +87,24 @@ function init(opts) {
 
 function check(byUser) {
   if (!supported || !updater) { if (byUser && hooks.toast) hooks.toast('Updates work in the installed app'); return; }
-  if (state.status === 'checking' || state.status === 'downloading' || state.status === 'ready') return;
+  if (['checking', 'downloading', 'ready', 'available'].includes(state.status)) return;
   manual = !!byUser;
   updater.checkForUpdates().catch(() => { /* reported through the "error" event */ });
 }
 
+// The releases page of the repository the installed app updates from (electron-builder wrote it into app-update.yml).
+function releasesUrl() {
+  try {
+    const yml = fs.readFileSync(path.join(process.resourcesPath, 'app-update.yml'), 'utf8');
+    const owner = /^owner:\s*(\S+)/m.exec(yml);
+    const repo = /^repo:\s*(\S+)/m.exec(yml);
+    if (owner && repo) return `https://github.com/${owner[1]}/${repo[1]}/releases/latest`;
+  } catch { /* not packaged */ }
+  return null;
+}
+
 function install() {
+  if (state.status === 'available') { const u = releasesUrl(); if (u) shell.openExternal(u); return !!u; }
   if (state.status !== 'ready' || !updater) return false;
   if (hooks.beforeInstall) hooks.beforeInstall();
   // silent install, then Tide starts again by itself

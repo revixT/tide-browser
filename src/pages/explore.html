@@ -48,7 +48,7 @@
       { id: 'snapshots', title: 'Snapshots', icon: svg('<rect x="3.5" y="6.5" width="17" height="12" rx="2.5"/><circle cx="12" cy="12.5" r="3"/><path d="M8 6.5l1.2-2h5.6l1.2 2"/>'), text: 'Tide saves your open tabs every 30 minutes. Go back to how things looked this morning.', go: 'browser://snapshots' },
     ];
     const TIPS = [
-      { title: 'Command bar', text: 'Press <kbd>Ctrl</kbd> + <kbd>K</kbd> to jump to any tab, search your history and Recall, or run an action.' },
+      { title: 'Command bar', text: `Press <kbd>${/Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl'}</kbd> + <kbd>K</kbd> to jump to any tab, search your history and Recall, or run an action.` },
       { title: 'Peek at links', text: 'Hold the mouse button down on a link, or <kbd>Alt</kbd> + click it, to preview the page without leaving this one.' },
       { title: 'Reader view', text: 'Press <kbd>F9</kbd> on an article to read it cleanly, or have it read aloud.' },
       { title: 'Site privacy panel', text: 'Click the padlock in the address bar to see what a site did, turn off blocking for it, or forget it completely.' },

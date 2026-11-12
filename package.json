@@ -1,14 +1,16 @@
 {
   "name": "tide-browser",
   "productName": "Tide Browser",
-  "version": "1.0.2",
-  "description": "A Chromium-based desktop browser for Windows",
+  "version": "1.0.3",
+  "description": "A Chromium-based desktop browser for Windows and macOS",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis --publish never",
     "release": "electron-builder --win nsis --publish always",
-    "pack": "electron-builder --win dir"
+    "pack": "electron-builder --win dir",
+    "dist:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish never",
+    "release:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish always"
   },
   "build": {
     "appId": "com.tide.browser",
@@ -27,7 +29,8 @@
       "enableNodeCliInspectArguments": false,
       "enableEmbeddedAsarIntegrityValidation": true,
       "onlyLoadAppFromAsar": true,
-      "grantFileProtocolExtraPrivileges": true
+      "grantFileProtocolExtraPrivileges": true,
+      "resetAdHocDarwinSignature": true
     },
     "copyright": "Copyright © 2026 Tide Browser",
     "win": {
@@ -41,6 +44,32 @@
         }
       ],
       "artifactName": "Tide-Browser-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "artifactName": "Tide-Browser-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "CFBundleURLTypes": [
+          { "CFBundleURLName": "Web site URL", "CFBundleURLSchemes": ["http", "https"] }
+        ],
+        "CFBundleDocumentTypes": [
+          { "CFBundleTypeName": "HTML document", "CFBundleTypeRole": "Viewer", "LSHandlerRank": "Alternate", "LSItemContentTypes": ["public.html", "public.xhtml"] }
+        ],
+        "NSCameraUsageDescription": "A website you allow can use the camera.",
+        "NSMicrophoneUsageDescription": "A website you allow can use the microphone.",
+        "NSLocationUsageDescription": "A website you allow can use your location."
+      }
+    },
+    "dmg": {
+      "title": "Tide Browser ${version}"
     },
     "nsis": {
       "oneClick": false,

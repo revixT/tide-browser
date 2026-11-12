@@ -71,7 +71,7 @@
       document.getElementById('clear').style.display = 'none';
       const p = h('div', 'panel');
       p.append(h('h2', '', 'Search everything you have read'));
-      if (!st.available) { p.appendChild(h('p', '', 'Recall needs Windows data protection, which is not available on this PC, so it stays off.')); main.textContent = ''; main.appendChild(p); return; }
+      if (!st.available) { p.appendChild(h('p', '', 'Recall needs the system encryption store (Windows data protection or the macOS Keychain), which is not available here, so it stays off.')); main.textContent = ''; main.appendChild(p); return; }
       p.appendChild(h('p', '', 'Turn on Recall and Tide keeps a private copy of the text of pages you read, so you can find them later by what they said, not just their title.'));
       const ul = h('ul');
       for (const t of ['Everything stays on this PC and is encrypted. Nothing is uploaded.', 'Private tabs, login pages and banking, health and tax sites are never saved.', 'You can remove any page or a whole site, exclude sites in Settings, and clear everything at any time.']) ul.appendChild(h('li', '', t));

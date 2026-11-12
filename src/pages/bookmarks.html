@@ -34,7 +34,7 @@
       list.textContent = '';
       if (!shown.length) {
         const d = document.createElement('div'); d.className = 'empty';
-        d.textContent = items.length ? 'No matches.' : 'No bookmarks yet. Press Ctrl+D on any page to add one, or import a bookmarks file.';
+        d.textContent = items.length ? 'No matches.' : `No bookmarks yet. Press ${/Mac/i.test(navigator.platform) ? '⌘D' : 'Ctrl+D'} on any page to add one, or import a bookmarks file.`;
         list.appendChild(d); return;
       }
       for (const b of shown) {

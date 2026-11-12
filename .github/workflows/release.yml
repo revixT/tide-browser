@@ -1,5 +1,7 @@
-# Builds the Windows installer and publishes a GitHub release when you push a version tag such as v1.0.3.
-# Installed copies of Tide find that release and update themselves.
+# Builds the Windows installer and the Mac disk images, and publishes a GitHub release, when you push a version
+# tag such as v1.0.3. Installed Windows copies of Tide find that release and update themselves. Mac copies find it
+# and point to the download page, because Mac updates need a signed app.
+# The Mac job waits for the Windows job so the two never try to create the same release at once.
 # No secrets are needed: GitHub gives every run a temporary token (GITHUB_TOKEN).
 name: Release
 
@@ -65,3 +67,38 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false' # the installer is not code-signed yet
+
+  release-mac:
+    needs: release
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Point update checks at this repository
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.build.publish = [{
+              provider: 'github',
+              owner: process.env.GITHUB_REPOSITORY_OWNER,
+              repo: process.env.GITHUB_REPOSITORY.split('/')[1],
+              releaseType: 'release'
+            }];
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+
+      - run: npm ci
+
+      - name: Build the Mac disk images and add them to the release
+        run: npm run release:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false' # the app is not signed with an Apple Developer ID yet

@@ -10,12 +10,20 @@ const MAX_HISTORY = 5000;
 const WEBKIT_EPOCH_MS = 11644473600000; // 1601-01-01 to 1970-01-01
 const COCOA_EPOCH_S = 978307200; // 1970-01-01 to 2001-01-01 (Safari)
 
-const CHROMIUM = {
+const MAC = process.platform === 'darwin';
+const APP_SUPPORT = path.join(os.homedir(), 'Library', 'Application Support');
+const SAFARI_DIR = path.join(os.homedir(), 'Library', 'Safari');
+
+const CHROMIUM = MAC ? {
+  chrome: { name: 'Google Chrome', dir: path.join(APP_SUPPORT, 'Google', 'Chrome') },
+  edge: { name: 'Microsoft Edge', dir: path.join(APP_SUPPORT, 'Microsoft Edge') },
+  brave: { name: 'Brave', dir: path.join(APP_SUPPORT, 'BraveSoftware', 'Brave-Browser') },
+} : {
   chrome: { name: 'Google Chrome', dir: path.join(LOCAL, 'Google', 'Chrome', 'User Data') },
   edge: { name: 'Microsoft Edge', dir: path.join(LOCAL, 'Microsoft', 'Edge', 'User Data') },
   brave: { name: 'Brave', dir: path.join(LOCAL, 'BraveSoftware', 'Brave-Browser', 'User Data') },
 };
-const FIREFOX_ROOT = path.join(ROAM, 'Mozilla', 'Firefox');
+const FIREFOX_ROOT = MAC ? path.join(APP_SUPPORT, 'Firefox') : path.join(ROAM, 'Mozilla', 'Firefox');
 
 const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
 const isWeb = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
@@ -66,6 +74,10 @@ function detectBrowsers() {
   }
   const ff = firefoxProfiles();
   if (ff.length) list.push({ id: 'firefox', name: 'Mozilla Firefox', profiles: ff });
+  // Safari's folder is protected by macOS. It only shows up once Tide has Full Disk Access.
+  if (MAC && exists(path.join(SAFARI_DIR, 'History.db'))) {
+    list.push({ id: 'safari', name: 'Safari', profiles: [{ id: 'default', name: 'Safari history', path: SAFARI_DIR, history: true, bookmarks: false, downloads: false }] });
+  }
   return list;
 }
 
@@ -175,7 +187,9 @@ function importFromProfile(browserId, profile, what) {
     if (!what[key]) return;
     try { out[key] = fn(); } catch (e) { out.errors.push(`${label}: ${friendly(e)}`); }
   };
-  if (browserId === 'firefox') {
+  if (browserId === 'safari') {
+    run('history', 'History', () => safariHistory(path.join(profile.path, 'History.db')));
+  } else if (browserId === 'firefox') {
     run('history', 'History', () => firefoxHistory(profile.path));
     run('bookmarks', 'Bookmarks', () => firefoxBookmarks(profile.path));
   } else {

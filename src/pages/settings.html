@@ -85,6 +85,8 @@
     let S = null;
     const $ = (id) => document.getElementById(id);
 
+    const MAC = /Mac/i.test(navigator.platform);
+    const OS = MAC ? 'macOS' : 'Windows';
     const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const save = (patch) => { Object.assign(S, patch); return api.setSettings(patch); };
 
@@ -160,7 +162,7 @@
 
     async function zoomBlock(card) {
       card.classList.add('col');
-      const top = h('div'); top.append(h('div', 't', 'Zoom levels'), h('div', 'd', 'Tide remembers your zoom for each site. Change zoom with Ctrl +, Ctrl − and Ctrl 0.'));
+      const top = h('div'); top.append(h('div', 't', 'Zoom levels'), h('div', 'd', MAC ? 'Tide remembers your zoom for each site. Change zoom with ⌘ +, ⌘ − and ⌘ 0.' : 'Tide remembers your zoom for each site. Change zoom with Ctrl +, Ctrl − and Ctrl 0.'));
       const list = h('div', 'list'); const reset = h('button', 'btn', 'Reset all to 100%');
       const load = async () => {
         const items = await api.getZoomSites(); list.textContent = '';
@@ -184,11 +186,13 @@
       for (const [k, l] of [['history', 'Browsing history'], ['bookmarks', 'Bookmarks'], ['downloads', 'Download history']]) {
         const lab = h('label'); const c = h('input'); c.type = 'checkbox'; c.checked = k !== 'downloads'; boxes[k] = c; lab.append(c, document.createTextNode(l)); lab._box = c; checks.appendChild(lab); boxes[k + 'Label'] = lab;
       }
-      const filesHelp = h('div', 'd', 'Safari is not available on Windows, so bring its data over from a Mac. In Safari choose File > Export > Bookmarks, and copy ~/Library/Safari/History.db for history. Then pick one or both files here. A bookmarks .html file from any browser works too.');
+      const filesHelp = h('div', 'd', MAC
+        ? 'Safari data is protected by macOS. In Safari choose File > Export > Bookmarks and pick that .html file here. For history, give Tide Full Disk Access in System Settings > Privacy & Security, then pick ~/Library/Safari/History.db. A bookmarks .html file from any browser works too.'
+        : 'Safari is not available on Windows, so bring its data over from a Mac. In Safari choose File > Export > Bookmarks, and copy ~/Library/Safari/History.db for history. Then pick one or both files here. A bookmarks .html file from any browser works too.');
       const row = h('div'); row.style.cssText = 'display:flex;gap:12px;align-items:center;flex-wrap:wrap';
       const go = h('button', 'btn', 'Import'); const msg = h('div', 'ok'); const err = h('div', 'note');
-      const note = h('div', 'd', 'Not imported: passwords, cookies, extensions and open tabs. Tide has no password manager, and browsers lock cookies and passwords to their own app, so other programs cannot copy them.');
-      if (!browsers.length) top.appendChild(h('div', 'd', 'No Chrome, Edge, Brave or Firefox profile was found on this PC.'));
+      const note = h('div', 'd', 'Not imported: passwords, cookies, extensions and open tabs. Browsers lock cookies and passwords to their own app, so other programs cannot copy them.');
+      if (!browsers.length) top.appendChild(h('div', 'd', MAC ? 'No Chrome, Edge, Brave or Firefox profile was found on this Mac.' : 'No Chrome, Edge, Brave or Firefox profile was found on this PC.'));
 
       const sync = () => {
         const isFiles = bsel.value === FILES;
@@ -260,8 +264,8 @@
         ['Page isolation', 'Every site runs in a sandboxed process with no access to your files or to Tide itself.'],
         ['Certificate checks', 'Sites with an invalid or untrusted certificate are blocked behind a warning.'],
         ['Network address privacy', 'WebRTC will not reveal your local network addresses to websites.'],
-        ['External app protection', 'A page cannot launch other programs. Risky Windows link types are blocked and the rest ask first.'],
-        ['Download safety', 'Downloads are marked as coming from the internet so Windows SmartScreen checks them, and risky file types ask before opening.'],
+        ['External app protection', `A page cannot launch other programs. Risky ${OS} link types are blocked and the rest ask first.`],
+        ['Download safety', `Downloads are marked as coming from the internet so ${MAC ? 'macOS Gatekeeper' : 'Windows SmartScreen'} checks them, and risky file types ask before opening.`],
         ['Vault encryption', 'AES-256-GCM with a key made from your master password using scrypt. The vault file never contains a readable password.'],
         ['Malware site list', `${info.malwareHosts.toLocaleString()} known dangerous hosts, last updated ${when}.`],
         ['Browser engine', `Chromium ${info.chromium}. Install Tide updates promptly, because Chromium security fixes ship through them.`],
@@ -296,7 +300,14 @@
 
     function shortcutsBlock(card) {
       card.classList.add('col');
-      const rows = [
+      const rows = MAC ? [
+        ['New tab', '⌘ T'], ['New private tab', '⇧ ⌘ N'], ['Close tab', '⌘ W'], ['Reopen closed tab', '⇧ ⌘ T'],
+        ['Next / previous tab', '⌃ Tab / ⌃ ⇧ Tab'], ['Go to tab 1 to 8', '⌘ 1 to 8'], ['Go to the last tab', '⌘ 9'],
+        ['Focus address bar', '⌘ L or F6'], ['Back / forward', '⌘ [ / ⌘ ]'], ['Reload', '⌘ R'], ['Hard reload', '⇧ ⌘ R'],
+        ['Find in page', '⌘ F'], ['Bookmark this page', '⌘ D'], ['Show or hide bookmarks bar', '⇧ ⌘ B'], ['History', '⌘ Y'],
+        ['Settings', '⌘ ,'], ['Clear browsing data', '⇧ ⌘ Delete'], ['Save page as', '⌘ S'], ['Open file', '⌘ O'], ['Print', '⌘ P'],
+        ['Zoom in / out / reset', '⌘ + / ⌘ − / ⌘ 0'], ['Full screen', '⌃ ⌘ F'], ['Developer tools', 'F12 or ⌥ ⌘ I'], ['View page source', '⌘ U'], ['Quit', '⌘ Q'],
+      ] : [
         ['New tab', 'Ctrl T'], ['New private tab', 'Ctrl Shift N'], ['Close tab', 'Ctrl W'], ['Reopen closed tab', 'Ctrl Shift T'],
         ['Next / previous tab', 'Ctrl Tab / Ctrl Shift Tab'], ['Go to tab 1 to 8', 'Ctrl 1 to 8'], ['Go to the last tab', 'Ctrl 9'],
         ['Focus address bar', 'Ctrl L, Alt D or F6'], ['Back / forward', 'Alt ← / Alt →'], ['Reload', 'F5 or Ctrl R'], ['Hard reload', 'Ctrl Shift R'],
@@ -317,17 +328,19 @@
       inst.style.cssText = 'background:var(--accent-bg);border-color:var(--accent-line);color:var(--on-accent);display:none';
       line.append(check, inst, msg);
       const paint = (u) => {
-        inst.style.display = u.status === 'ready' ? '' : 'none';
-        check.disabled = !u.supported || ['checking', 'downloading', 'ready'].includes(u.status);
+        inst.style.display = u.status === 'ready' || u.status === 'available' ? '' : 'none';
+        inst.textContent = u.status === 'available' ? 'Download update' : 'Restart to update';
+        inst.disabled = false;
+        check.disabled = !u.supported || ['checking', 'downloading', 'ready', 'available'].includes(u.status);
         msg.className = u.status === 'error' && u.kind !== 'nofeed' ? 'note' : 'ok';
         const t = { unsupported: 'Updates work in the installed app.', idle: `You have Tide ${u.current}.`, checking: 'Checking…', none: `Tide ${u.current} is the latest version.`,
-          downloading: `Downloading Tide ${u.version}… ${u.percent}%`, ready: `Tide ${u.version} is ready.`, error: u.kind === 'nofeed' ? `${u.error} You have Tide ${u.current}.` : u.error }[u.status];
+          downloading: `Downloading Tide ${u.version}… ${u.percent}%`, ready: `Tide ${u.version} is ready.`, available: `Tide ${u.version} is available. Download it and drag it over the old copy in Applications.`, error: u.kind === 'nofeed' ? `${u.error} You have Tide ${u.current}.` : u.error }[u.status];
         msg.textContent = t || '';
       };
       let timer;
       const poll = async () => { const u = await api.updateStatus(); paint(u); clearTimeout(timer); if (['checking', 'downloading'].includes(u.status)) timer = setTimeout(poll, 700); };
       check.onclick = async () => { paint(await api.updateCheck()); setTimeout(poll, 500); };
-      inst.onclick = () => { inst.disabled = true; inst.textContent = 'Restarting…'; api.updateInstall(); };
+      inst.onclick = () => { if (inst.textContent === 'Download update') { api.updateInstall(); return; } inst.disabled = true; inst.textContent = 'Restarting…'; api.updateInstall(); };
       card.append(top, line); poll();
     }
 
@@ -349,13 +362,13 @@
         { type: 'select', key: 'startup', label: 'On startup', desc: 'What Tide opens when you launch it. Pinned tabs always come back.',
           options: [['newtab', 'Open the New Tab page'], ['continue', 'Continue where I left off'], ['custom', 'Open a specific page']] },
         { type: 'text', key: 'startupUrl', label: 'Startup page', desc: 'Tide opens this page on startup when "Open a specific page" is selected.', placeholder: 'https://example.com', showIf: () => S.startup === 'custom' },
-        { type: 'toggle', key: 'bookmarksBar', label: 'Show bookmarks bar', desc: 'Shows your bookmarks in a row under the toolbar. Shortcut: Ctrl+Shift+B.' },
-        { type: 'button', label: 'Default browser', desc: 'Open Windows settings to make Tide the browser that opens links.', button: 'Open Windows settings', action: () => api.openDefaultApps() },
+        { type: 'toggle', key: 'bookmarksBar', label: 'Show bookmarks bar', desc: `Shows your bookmarks in a row under the toolbar. Shortcut: ${MAC ? '⇧⌘B' : 'Ctrl+Shift+B'}.` },
+        { type: 'button', label: 'Default browser', desc: `Open ${OS} settings to make Tide the browser that opens links.`, button: `Open ${OS} settings`, action: () => api.openDefaultApps() },
       ] },
       { id: 'appearance', title: 'Appearance', lead: 'Theme and animation.', items: [
         { type: 'select', key: 'theme', label: 'Theme', desc: 'Light or dark for Tide and for websites that support both. The sun and moon button in the left menu switches it too.',
-          options: [['dark', 'Dark'], ['light', 'Light'], ['system', 'Match Windows']] },
-        { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', desc: 'Turns off most animations, including the launch sequence. Tide also follows the Windows "Show animations" setting.' },
+          options: [['dark', 'Dark'], ['light', 'Light'], ['system', `Match ${OS}`]] },
+        { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', desc: MAC ? 'Turns off most animations, including the launch sequence. Tide also follows the macOS "Reduce motion" setting.' : 'Turns off most animations, including the launch sequence. Tide also follows the Windows "Show animations" setting.' },
       ] },
       { id: 'search', title: 'Search', lead: 'What the address bar searches with.', items: [
         { type: 'select', key: 'searchEngine', label: 'Search engine', desc: 'Used when you type something that is not a web address.', options: () => Object.entries(S.meta.engines) },
@@ -387,7 +400,7 @@
         { type: 'button', label: 'Search your Recall', desc: 'Open the page where you search everything you have read.', button: 'Open Recall', action: () => api.navigate('browser://recall') },
         { type: 'select', key: 'orbitMinutes', numeric: true, label: 'Move unused tabs to Orbits after', desc: 'Tabs you have not looked at for this long leave the tab strip and wait in Orbits. Pinned, playing and private tabs stay.',
           options: [[0, 'Never'], [60, '1 hour'], [240, '4 hours'], [480, '8 hours'], [1440, '1 day'], [4320, '3 days']] },
-        { type: 'toggle', key: 'peekEnabled', label: 'Link preview', desc: 'Hold the mouse button on a link, or Alt+click it, to preview the page in a floating window.' },
+        { type: 'toggle', key: 'peekEnabled', label: 'Link preview', desc: `Hold the mouse button on a link, or ${MAC ? 'Option' : 'Alt'}+click it, to preview the page in a floating window.` },
         { type: 'toggle', key: 'snapshotsAuto', label: 'Automatic session snapshots', desc: 'Save your open tabs every 30 minutes and when you quit, so you can go back to an earlier session.' },
         { type: 'button', label: 'Everything else', desc: 'Focus mode, Trail, Constellations and Snapshots live on the Explore page.', button: 'Open Explore', action: () => api.navigate('browser://explore') },
       ] },

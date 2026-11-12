@@ -41,6 +41,9 @@ button:not(:disabled):active { transform: scale(0.88); }
 @keyframes sideIn { from { opacity: 0; transform: translateX(-34px); } }
 @keyframes popIn { from { opacity: 0; transform: scale(.2) rotate(-30deg); } }
 
+/* macOS: leave room for the traffic lights on the left, and none on the right (no caption buttons there). */
+:root[data-platform="darwin"] #tabstrip { padding: 0 12px 0 84px; }
+
 /* ---------- tab strip ---------- */
 #tabstrip {
   position: absolute; top: 0; left: 0; right: 0; height: 44px;

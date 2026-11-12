@@ -8,6 +8,14 @@ const findInput = $('find-input');
 const EASE = 'cubic-bezier(.22,1,.36,1)';
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// On a Mac the shortcuts use the Command key, and the traffic lights sit at the left of the tab strip.
+const IS_MAC = /Mac/i.test(navigator.platform);
+const K = (s) => (IS_MAC ? s.replace(/Alt\+Left/g, '⌘[').replace(/Alt\+Right/g, '⌘]').replace(/Ctrl\+Shift\+/g, '⇧⌘').replace(/Ctrl\+/g, '⌘') : s);
+if (IS_MAC) {
+  document.documentElement.dataset.platform = 'darwin';
+  document.querySelectorAll('[title]').forEach((el) => { el.title = K(el.title); });
+}
+
 let state = { tabs: [], activeId: null, bookmarks: [] };
 let editing = false;
 let dragId = null;
@@ -310,7 +318,7 @@ function renderBookmarksBar() {
   if (!state.bookmarks.length) {
     const hint = document.createElement('span');
     hint.className = 'bm-empty';
-    hint.textContent = 'Bookmark pages with Ctrl+D and they will show up here';
+    hint.textContent = `Bookmark pages with ${K('Ctrl+D')} and they will show up here`;
     bar.appendChild(hint);
     return;
   }
@@ -356,7 +364,7 @@ function render() {
   $('forward').disabled = !(active && active.canGoForward);
   const loading = !!(active && active.loading);
   $('reload-use').setAttribute('href', loading ? '#i-x' : '#i-reload');
-  $('reload').title = loading ? 'Stop' : 'Reload (Ctrl+R)';
+  $('reload').title = loading ? 'Stop' : K('Reload (Ctrl+R)');
   $('progress').classList.toggle('on', loading);
 
   const star = $('star');
