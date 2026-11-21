@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="shared.css">
+<title>Settings</title>
+<script src="bridge.js"></script>
+<style>
+  main { padding-top: 4px; }
+  section { margin: 18px 4px 0; }
+  section h2 { margin: 0 12px 8px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+  .item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; min-height: 62px; border-top: 1px solid var(--line); }
+  .item:first-child { border-top: 0; }
+  .item.tap:active { background: rgb(var(--ov) / .05); }
+  .item .col { flex: 1; min-width: 0; }
+  .item .lbl { font-size: 15.5px; }
+  .item .sub { color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 3px; }
+  .item.off { opacity: .45; pointer-events: none; }
+
+  /* switch */
+  .sw { position: relative; width: 46px; height: 28px; flex: none; }
+  .sw input { position: absolute; inset: 0; opacity: 0; margin: 0; z-index: 1; }
+  .sw i { position: absolute; inset: 0; border-radius: 14px; background: var(--track); transition: background .25s; }
+  .sw i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .4s var(--spring); }
+  .sw input:checked + i { background: var(--accent-bg); }
+  .sw input:checked + i::after { transform: translateX(18px); }
+
+  /* segmented choice */
+  .seg { display: flex; gap: 4px; padding: 4px; margin: 4px 0 2px; border-radius: 16px; background: var(--surface2); border: 1px solid var(--line); }
+  .seg button { flex: 1; height: 38px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); font: 14px system-ui, sans-serif; transition: background .25s, color .25s, transform .3s var(--spring); }
+  .seg button.on { background: var(--surface); color: var(--text-strong); box-shadow: 0 1px 4px rgb(var(--shadow-rgb) / calc(.35 * var(--shadow-k))); }
+  .seg button:active { transform: scale(.95); }
+  .stack { display: block; }
+
+  select { width: 100%; margin-top: 8px; }
+  .checks label { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 15px; }
+  .checks input { width: 20px; height: 20px; accent-color: var(--accent-bg); }
+  .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .chev { color: var(--muted); font-size: 18px; }
+  .ok { color: var(--ok); }
+
+  .about { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 16px 22px; }
+  .about svg.logo { width: 64px; height: 64px; filter: drop-shadow(0 0 16px rgb(var(--glow-rgb) / calc(.6 * var(--fx)))); animation: aboutIn 1.2s cubic-bezier(.34,1.45,.5,1) backwards; }
+  @keyframes aboutIn { from { transform: scale(0) rotate(-200deg); opacity: 0; } }
+  .about .nm { margin-top: 14px; font-size: 13px; letter-spacing: .6em; margin-right: -.6em; color: var(--text); }
+  .about .ver { margin-top: 8px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+  .links { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+  :root { --logo-1: #ffffff; --logo-2: #8fa8ff; }
+  @media (prefers-color-scheme: light) { :root { --logo-1: #3556d8; --logo-2: #8ea4ff; } }
+</style>
+</head>
+<body>
+  <header class="bar"><div class="top"><h1>Settings</h1></div></header>
+  <main id="main">
+
+    <section>
+      <h2>Appearance</h2>
+      <div class="card">
+        <div class="item stack" id="themeItem">
+          <div class="lbl">Theme</div>
+          <div class="seg" id="theme"><button data-v="system">Match phone</button><button data-v="dark">Dark</button><button data-v="light">Light</button></div>
+          <div class="sub" id="themeNote" hidden>Your Android version can't set a theme per app, so Tide follows your phone's dark mode.</div>
+        </div>
+        <div class="item"><div class="col"><div class="lbl">Reduce motion</div><div class="sub">Calmer home page and page animations.</div></div><label class="sw"><input type="checkbox" data-k="reduceMotion"><i></i></label></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Search</h2>
+      <div class="card">
+        <div class="item stack"><div class="lbl">Search engine</div><select id="search"></select>
+          <div class="sub">Address bar suggestions come from your own history and bookmarks. What you type is not sent anywhere until you search.</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Privacy and security</h2>
+      <div class="card">
+        <div class="item"><div class="col"><div class="lbl">Block ads and trackers</div><div class="sub" id="blockSub">Stops known ad and tracking servers on every site.</div></div><label class="sw"><input type="checkbox" data-k="blockAds"><i></i></label></div>
+        <div class="item"><div class="col"><div class="lbl">Remove tracking from links</div><div class="sub">Strips tags like utm_source and fbclid from addresses you open.</div></div><label class="sw"><input type="checkbox" data-k="stripTracking"><i></i></label></div>
+        <div class="item"><div class="col"><div class="lbl">Block third-party cookies</div><div class="sub">Sites can't follow you across other sites with cookies.</div></div><label class="sw"><input type="checkbox" data-k="blockThirdPartyCookies"><i></i></label></div>
+        <div class="item"><div class="col"><div class="lbl">HTTPS only</div><div class="sub">Always use the secure version of a site.</div></div><label class="sw"><input type="checkbox" data-k="httpsOnly"><i></i></label></div>
+        <div class="item"><div class="col"><div class="lbl">Dangerous site warnings</div><div class="sub" id="malSub">Warns before sites on a public malware list. Only the list is downloaded.</div></div><label class="sw"><input type="checkbox" data-k="malwareWarnings"><i></i></label></div>
+        <div class="item"><div class="col"><div class="lbl">Google Safe Browsing</div><div class="sub">Android's built-in check for phishing and malware pages.</div></div><label class="sw"><input type="checkbox" data-k="googleSafeBrowsing"><i></i></label></div>
+      </div>
+    </section>
+
+    <section id="privacy">
+      <h2>Clear browsing data</h2>
+      <div class="card">
+        <div class="item stack checks">
+          <label><input type="checkbox" id="c-history" checked> History</label>
+          <label><input type="checkbox" id="c-cookies"> Cookies and site data <span class="sub">(signs you out of sites)</span></label>
+          <label><input type="checkbox" id="c-cache" checked> Cached images and files</label>
+          <div class="acts"><button class="btn p" id="clear">Clear data</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tabs</h2>
+      <div class="card">
+        <div class="item"><div class="col"><div class="lbl">Reopen tabs from last time</div><div class="sub">Private tabs are never reopened.</div></div><label class="sw"><input type="checkbox" data-k="restoreTabs"><i></i></label></div>
+        <div class="item stack"><div class="lbl">Move unused tabs to Orbits after</div>
+          <select id="orbit"><option value="0">Never</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="480">8 hours</option><option value="1440">1 day</option><option value="4320">3 days</option></select>
+          <div class="sub">Tabs you have not looked at for this long leave your tabs and wait in Orbits. Playing and private tabs stay.</div></div>
+        <div class="item"><div class="col"><div class="lbl">Automatic snapshots</div><div class="sub">Save your open tabs every 30 minutes and when you leave Tide.</div></div><label class="sw"><input type="checkbox" data-k="snapshotsAuto"><i></i></label></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Default browser</h2>
+      <div class="card">
+        <div class="item tap" id="def"><div class="col"><div class="lbl" id="defLbl">Make Tide your default browser</div><div class="sub" id="defSub">Links from other apps will open in Tide.</div></div><span class="chev">›</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>About</h2>
+      <div class="card about">
+        <svg class="logo" viewBox="0 0 100 100">
+          <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--logo-1)"/><stop offset="1" style="stop-color:var(--logo-2)"/></linearGradient></defs>
+          <mask id="tm"><rect width="100" height="100" fill="#fff"/><path d="M0 57q12.5-12 25 0t25 0t25 0t25 0" fill="none" stroke="#000" stroke-width="6.5"/><path d="M0 75q12.5 12 25 0t25 0t25 0t25 0" fill="none" stroke="#000" stroke-width="6.5"/></mask>
+          <circle cx="50" cy="50" r="46" fill="url(#g)" mask="url(#tm)"/>
+        </svg>
+        <div class="nm">TIDE</div>
+        <div class="ver" id="ver"></div>
+        <div class="links"><button class="btn" id="site">Website</button><button class="btn" id="src">Source code</button></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let settings = {};
+    let info = {};
+
+    function paint() {
+      document.querySelectorAll('[data-k]').forEach((el) => { el.checked = !!settings[el.dataset.k]; });
+      document.querySelectorAll('#theme button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.theme));
+      $('search').value = settings.search;
+      $('orbit').value = String(settings.orbitMinutes);
+    }
+
+    async function save(patch) {
+      settings = await window.tidePage.setSettings(patch);
+      paint();
+    }
+
+    document.querySelectorAll('[data-k]').forEach((el) => el.addEventListener('change', () => save({ [el.dataset.k]: el.checked })));
+    document.querySelectorAll('#theme button').forEach((b) => b.addEventListener('click', () => save({ theme: b.dataset.v })));
+    $('search').addEventListener('change', () => save({ search: $('search').value }));
+    $('orbit').addEventListener('change', () => save({ orbitMinutes: Number($('orbit').value) }));
+    $('clear').onclick = async () => {
+      const o = { history: $('c-history').checked, cookies: $('c-cookies').checked, cache: $('c-cache').checked };
+      if (!o.history && !o.cookies && !o.cache) return;
+      await window.tidePage.clearData(o);
+    };
+    $('def').onclick = () => window.tidePage.openDefaultApps();
+    $('site').onclick = () => window.tidePage.openUrl('https://ternastra.com/tide');
+    $('src').onclick = () => window.tidePage.openUrl('https://github.com/revixT/tide-browser');
+
+    async function loadInfo() {
+      info = await window.tidePage.info();
+      if (!$('search').options.length) {
+        for (const e of info.engines) $('search').appendChild(Object.assign(document.createElement('option'), { value: e.id, textContent: e.name }));
+        $('search').value = settings.search;
+      }
+      if (!info.canSetTheme) { $('theme').classList.add('off'); $('theme').style.pointerEvents = 'none'; $('theme').style.opacity = '.45'; $('themeNote').hidden = false; }
+      $('defLbl').textContent = info.isDefault ? 'Tide is your default browser' : 'Make Tide your default browser';
+      $('defSub').textContent = info.isDefault ? 'Links from other apps open in Tide. Tap to change.' : 'Links from other apps will open in Tide.';
+      $('defLbl').classList.toggle('ok', info.isDefault);
+      $('blockSub').textContent = `Stops ${info.blockList} known ad and tracking services on every site. Turn it off for one site from the shield in the menu.`;
+      const when = info.malwareUpdated ? new Date(info.malwareUpdated).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet';
+      $('malSub').textContent = `Warns before sites on the abuse.ch URLhaus malware list (${info.malwareHosts.toLocaleString()} sites, updated ${when}). Only the list is downloaded.`;
+      $('ver').innerHTML = '';
+      $('ver').append(`Version ${info.version}`, document.createElement('br'), `Android ${info.android}  ·  Chromium WebView ${info.webview}`);
+    }
+
+    (async () => {
+      settings = await window.tidePage.getSettings();
+      paint();
+      document.body.querySelector('main').classList.add('animate');
+      await loadInfo();
+      if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+    })();
+    addEventListener('tide:refresh', loadInfo);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadInfo(); });
+  </script>
+</body>
+</html>

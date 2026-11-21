@@ -7,6 +7,7 @@ const call = (c) => (...a) => ipcRenderer.invoke(`internal:${c}`, ...a);
 if (location.protocol === 'file:') contextBridge.exposeInMainWorld('tidePage', {
   introSeen: call('introSeen'),
   navigate: call('navigate'),
+  closePanel: call('closePanel'),
   getShortcuts: call('getShortcuts'),
   getSettings: call('getSettings'),
   setSettings: call('setSettings'),

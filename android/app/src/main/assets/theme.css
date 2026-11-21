@@ -1,0 +1,64 @@
+/* Tide colour tokens. Dark is the default. The main process sets the app theme (dark, light or
+   follow Windows), and Chromium reports it through prefers-color-scheme.
+   The look is flat and quiet: hairline borders, soft surfaces, one blue accent, and glows kept faint. */
+:root {
+  color-scheme: light dark;
+
+  --bg: #0c0d10;            /* page and window background */
+  --surface: #131419;       /* cards, panels, menus */
+  --surface2: #1a1b21;      /* buttons, chips */
+  --track: #262830;         /* progress and meter tracks */
+  --line: #1f2127;          /* hairlines */
+  --border: #2d3039;        /* input and button borders */
+  --text: #e6e8ed;
+  --text-strong: #f6f7fa;
+  --muted: #868b99;
+  --accent: #8ba3ff;
+  --accent-soft: #c3cffd;
+  --accent-line: #4d63d9;
+  --accent-bg: #3f55cf;     /* primary button */
+  --on-accent: #ffffff;
+  --ok: #6fd89a;
+  --bad: #ff8f8f;
+  --warn: #f2b266;
+
+  /* channel triplets, used as rgb(var(--x) / alpha) */
+  --ov: 255 255 255;        /* hover and overlay tint */
+  --glow-rgb: 139 163 255;  /* accent tint for focus rings and soft highlights */
+  --shadow-rgb: 0 0 0;
+  --shadow-k: .8;           /* shadow strength multiplier */
+  --bad-rgb: 255 120 120;
+  --fx: .4;                 /* how strong glows are. 1 is the old neon look, 0 is none */
+
+  --glow: rgb(var(--glow-rgb) / .35);
+  --hover: rgb(var(--ov) / .07);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface2: #f1f2f5;
+    --track: #e4e6eb;
+    --line: #e9ebef;
+    --border: #d9dce3;
+    --text: #1b1d24;
+    --text-strong: #0c0e14;
+    --muted: #6a6f7e;
+    --accent: #3d58d8;
+    --accent-soft: #2f46b4;
+    --accent-line: #3d58d8;
+    --accent-bg: #3d58d8;
+    --on-accent: #ffffff;
+    --ok: #1f9d55;
+    --bad: #d33a3a;
+    --warn: #b86a0a;
+
+    --ov: 20 30 70;
+    --glow-rgb: 61 88 216;
+    --shadow-rgb: 40 55 110;
+    --shadow-k: .18;
+    --bad-rgb: 211 58 58;
+    --fx: .45;
+  }
+}

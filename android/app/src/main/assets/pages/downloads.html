@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="shared.css">
+<title>Downloads</title>
+<script src="bridge.js"></script>
+<style>
+  .fav svg { width: 18px; height: 18px; color: var(--text); }
+  .bar2 { height: 3px; border-radius: 2px; background: var(--track); margin-top: 8px; overflow: hidden; }
+  .bar2 i { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s var(--expo); }
+  .risky { color: var(--warn); }
+  .failed { color: var(--bad); }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <div class="top"><h1>Downloads</h1><button class="btn" id="folder">Open folder</button></div>
+  </header>
+  <main id="list"></main>
+  <script>
+    let firstPaint = true;
+    const list = document.getElementById('list');
+    const size = (b) => b < 0 ? '' : b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : b < 1073741824 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1073741824).toFixed(2) + ' GB';
+    const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+    const ICON = '<svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4.5 19.5h15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    let timer = 0;
+
+    function render(items) {
+      list.classList.toggle('animate', firstPaint);
+      firstPaint = false;
+      list.textContent = '';
+      if (!items.length) {
+        const d = document.createElement('div'); d.className = 'empty';
+        d.textContent = 'No downloads yet. Files you save go to the Downloads folder on your phone.';
+        list.appendChild(d); return;
+      }
+      items.forEach((d, n) => {
+        const row = document.createElement('div'); row.className = 'row'; row.style.setProperty('--i', n);
+        const fav = document.createElement('div'); fav.className = 'fav'; fav.innerHTML = ICON;
+        const col = document.createElement('div'); col.className = 'col';
+        const title = document.createElement('div'); title.className = 'title'; title.textContent = d.name;
+        const sub = document.createElement('div'); sub.className = 'url';
+        let text = host(d.url);
+        if (d.state === 'running' || d.state === 'paused') {
+          text = (d.total > 0 ? size(d.received) + ' of ' + size(d.total) : size(d.received)) + (d.state === 'paused' ? '  ·  Waiting' : '');
+        } else if (d.state === 'done') {
+          text = size(d.total) + '  ·  ' + host(d.url);
+        } else if (d.state === 'failed') {
+          text = 'Failed'; sub.classList.add('failed');
+        } else if (d.state === 'gone') {
+          text = 'Removed from Downloads';
+        }
+        if (d.risky && d.state === 'done') { text += '  ·  Can install apps or run code'; sub.classList.add('risky'); }
+        sub.textContent = text;
+        col.append(title, sub);
+        if (d.state === 'running' || d.state === 'paused') {
+          const b = document.createElement('div'); b.className = 'bar2';
+          const i = document.createElement('i'); i.style.width = (d.total > 0 ? Math.round(d.received / d.total * 100) : 8) + '%';
+          b.appendChild(i); col.appendChild(b);
+        }
+        const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕';
+        const running = d.state === 'running' || d.state === 'paused';
+        x.setAttribute('aria-label', running ? 'Cancel download' : 'Remove from list');
+        x.onclick = async (e) => {
+          e.stopPropagation();
+          if (running) await window.tidePage.cancelDownload(d.id); else await window.tidePage.removeDownload(d.id);
+          row.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateX(60px)' }], { duration: 240, fill: 'forwards' }).onfinish = load;
+        };
+        row.append(fav, col, x);
+        if (d.state === 'done') row.onclick = () => window.tidePage.openDownload(d.id);
+        list.appendChild(row);
+      });
+    }
+
+    async function load() {
+      clearTimeout(timer);
+      const items = await window.tidePage.getDownloads().catch(() => []);
+      render(items);
+      if (items.some((d) => d.state === 'running' || d.state === 'paused')) timer = setTimeout(load, 1000);
+    }
+    document.getElementById('folder').onclick = () => window.tidePage.showDownloadsFolder();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+    load();
+  </script>
+</body>
+</html>

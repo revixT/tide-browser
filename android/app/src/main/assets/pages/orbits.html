@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="shared.css">
+<title>Orbits</title>
+<script src="bridge.js"></script>
+<style>
+  /* Tide for Android: same as desktop src/pages/orbits.html, laid out for a phone (the orbit view sits above the list). */
+  .acts { display: flex; gap: 8px; margin-top: 12px; }
+  .btn.danger { border-color: rgb(var(--bad-rgb) / .5); }
+  .sysw { display: flex; justify-content: center; padding: 8px 0 0; }
+  svg#sys { width: min(92vw, 380px); height: auto; aspect-ratio: 1; overflow: visible; animation: sysIn 1s var(--expo) backwards; }
+  @keyframes sysIn { from { opacity: 0; transform: scale(.85) rotate(-20deg); filter: blur(6px); } }
+  .ring { fill: none; stroke: rgb(var(--glow-rgb) / .22); stroke-width: 1.4; stroke-dasharray: 3 7; }
+  .rot { transform-origin: 300px 300px; animation: spin var(--d) linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pl circle { fill: var(--surface2); stroke: rgb(var(--glow-rgb) / .7); stroke-width: 1.6; transition: r .3s var(--spring), fill .3s; }
+  .pl.hot circle { r: 19; fill: rgb(var(--glow-rgb) / .35); }
+  .pl text { font: 600 14px system-ui, sans-serif; fill: var(--text); text-anchor: middle; dominant-baseline: central; pointer-events: none; text-transform: uppercase; }
+  .sun { filter: drop-shadow(0 0 14px rgb(var(--glow-rgb) / calc(.8 * var(--fx)))); animation: pulse 4s ease-in-out infinite; transform-origin: 300px 300px; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  .lbl { font: 15px system-ui, sans-serif; fill: var(--muted); text-anchor: middle; }
+  .ava { width: 34px; height: 34px; border-radius: 50%; flex: none; background: rgb(var(--glow-rgb) / .15); color: var(--accent-soft); display: grid; place-items: center; font-weight: 600; text-transform: uppercase; }
+  .row.hot { background: rgb(var(--ov) / .07); }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <div class="top"><h1>Orbits</h1></div>
+    <input type="search" class="search" id="q" placeholder="Search archived tabs" autocomplete="off">
+    <div class="acts"><button class="btn" id="sweep">Send other tabs</button><button class="btn danger" id="clear">Clear</button></div>
+  </header>
+  <div class="sysw"><svg id="sys" viewBox="0 0 600 600" aria-label="Orbit view"></svg></div>
+  <main id="list"></main>
+  <script>
+    const api = window.tidePage;
+    const NS = 'http://www.w3.org/2000/svg';
+    const list = document.getElementById('list');
+    const sys = document.getElementById('sys');
+    let items = [];
+    let first = true;
+    const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+    const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+    const hash = (s) => { let x = 0; for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) >>> 0; return x; };
+    const el = (tag, attrs = {}, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
+    const hot = (id, on) => document.querySelectorAll(`[data-id="${id}"]`).forEach((n) => n.classList.toggle('hot', on));
+
+    function restore(o) { api.orbitRestore(o.id); }
+
+    function drawSystem(filtered) {
+      sys.textContent = '';
+      const rings = [
+        { r: 118, label: 'Today', test: (o) => Date.now() - o.archivedAt < 864e5, dur: 70 },
+        { r: 190, label: 'This week', test: (o) => Date.now() - o.archivedAt < 7 * 864e5, dur: 110 },
+        { r: 262, label: 'Older', test: () => true, dur: 160 },
+      ];
+      const placed = new Set();
+      rings.forEach((rg) => {
+        sys.appendChild(el('circle', { cx: 300, cy: 300, r: rg.r, class: 'ring' }));
+        const mine = filtered.filter((o) => !placed.has(o.id) && rg.test(o)).slice(0, 24);
+        mine.forEach((o) => placed.add(o.id));
+        const g = el('g', { class: 'rot', style: `--d:${rg.dur}s` });
+        mine.forEach((o, i) => {
+          const ang = ((i / Math.max(mine.length, 1)) * 360 + (hash(o.id) % 20)) * Math.PI / 180;
+          const p = el('g', { class: 'pl', 'data-id': o.id, transform: `translate(${300 + Math.cos(ang) * rg.r} ${300 + Math.sin(ang) * rg.r})` });
+          p.append(el('circle', { r: 15 }), el('text', {}, (host(o.url)[0] || '?')));
+          p.addEventListener('touchstart', () => hot(o.id, true), { passive: true });
+          p.addEventListener('touchend', () => hot(o.id, false));
+          p.addEventListener('click', () => restore(o));
+          g.appendChild(p);
+        });
+        sys.appendChild(g);
+        sys.appendChild(el('text', { x: 300, y: 300 - rg.r - 10, class: 'lbl' }, rg.label));
+      });
+      const sun = el('g', { class: 'sun' });
+      sun.append(el('circle', { cx: 300, cy: 300, r: 30, fill: 'var(--accent)', opacity: '.25' }), el('path', { d: 'M300 276c2 14 7 21 24 24-17 3-22 10-24 24-2-14-7-21-24-24 17-3 22-10 24-24z', fill: 'var(--accent)' }));
+      sys.appendChild(sun);
+    }
+
+    function draw() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const filtered = items.filter((o) => !q || `${o.title} ${o.url} ${o.summary}`.toLowerCase().includes(q));
+      list.classList.toggle('animate', first); first = false;
+      list.textContent = '';
+      if (!filtered.length) {
+        const e = document.createElement('div'); e.className = 'empty';
+        e.textContent = items.length ? 'Nothing matches that.' : 'No tabs in orbit yet. Tabs you have not used for a while drift here. You can send the others now with the button above.';
+        list.appendChild(e);
+      }
+      filtered.forEach((o, i) => {
+        const d = document.createElement('div'); d.className = 'row'; d.style.setProperty('--i', i); d.dataset.id = o.id;
+        const ava = document.createElement('div'); ava.className = 'ava'; ava.textContent = host(o.url)[0] || '?';
+        const col = document.createElement('div'); col.className = 'col';
+        const a = document.createElement('div'); a.className = 'title'; a.textContent = o.title;
+        const b = document.createElement('div'); b.className = 'url'; b.textContent = `${host(o.url)}  ·  ${ago(o.archivedAt)}`;
+        col.append(a, b);
+        const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove from Orbits');
+        x.onclick = async (e) => {
+          e.stopPropagation();
+          await api.orbitRemove(o.id);
+          d.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateX(60px)' }], { duration: 240, fill: 'forwards' }).onfinish = () => { items = items.filter((n) => n.id !== o.id); draw(); };
+        };
+        d.append(ava, col, x);
+        d.onclick = () => restore(o);
+        list.appendChild(d);
+      });
+      drawSystem(filtered);
+    }
+
+    document.getElementById('q').addEventListener('input', draw);
+    document.getElementById('clear').onclick = async function () {
+      if (!items.length) return;
+      if (this.dataset.armed !== '1') { this.dataset.armed = '1'; this.textContent = 'Tap again to clear'; setTimeout(() => { this.dataset.armed = ''; this.textContent = 'Clear'; }, 3500); return; }
+      await api.orbitClear(); items = []; this.textContent = 'Clear'; this.dataset.armed = ''; draw();
+    };
+    document.getElementById('sweep').onclick = async function () {
+      this.disabled = true;
+      const n = await api.orbitSweep();
+      this.textContent = n ? `Moved ${n}` : 'Nothing to move';
+      items = await api.orbitsList(); draw();
+      setTimeout(() => { this.textContent = 'Send other tabs'; this.disabled = false; }, 1800);
+    };
+    const load = () => api.orbitsList().then((l) => { items = l; draw(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<title>Reader</title>
+<script src="bridge.js"></script>
+<style>
+  /* Tide for Android: same as desktop src/pages/reader.html. Read aloud uses Android's text-to-speech through the app. */
+  :root { --spring: cubic-bezier(.34,1.56,.64,1); --expo: cubic-bezier(.16,1,.3,1); --fs: 18px; --ff: system-ui, "Roboto", sans-serif; --lh: 1.7; --ls: 0; --ws: 0; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, "Roboto", sans-serif; }
+  #tools { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none;
+    background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); animation: down .6s var(--expo); }
+  #tools::-webkit-scrollbar { display: none; }
+  @keyframes down { from { opacity: 0; transform: translateY(-14px); } }
+  button, select { height: 38px; flex: none; border-radius: 19px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font: 14px system-ui, sans-serif; padding: 0 14px; transition: transform .3s var(--spring); }
+  select { padding: 0 8px; }
+  button:active { transform: scale(.92); }
+  button.i { width: 38px; padding: 0; }
+  button.p { background: var(--accent-bg); border-color: var(--accent-line); color: var(--on-accent); }
+  button:disabled { opacity: .4; }
+  article { max-width: 720px; margin: 0 auto; padding: 26px 20px 120px; font: var(--fs)/var(--lh) var(--ff); letter-spacing: var(--ls); word-spacing: var(--ws); animation: rise .8s var(--expo); }
+  @keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+  article h1 { font-size: 1.7em; line-height: 1.22; margin: 0 0 8px; font-weight: 600; color: var(--text-strong); }
+  .meta { color: var(--muted); font-size: .75em; margin-bottom: 26px; }
+  article h2 { font-size: 1.35em; margin: 1.5em 0 .3em; color: var(--text-strong); line-height: 1.3; }
+  article h3 { font-size: 1.15em; margin: 1.3em 0 .2em; color: var(--text-strong); }
+  article p { margin: 0 0 1.1em; }
+  article blockquote { margin: 1.2em 0; padding: .2em 1em; border-left: 3px solid var(--accent); color: var(--muted); }
+  article ul { padding-left: 1.3em; margin: 0 0 1.1em; }
+  article pre { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; overflow: auto; font: 13px ui-monospace, monospace; white-space: pre-wrap; }
+  article img { max-width: 100%; height: auto; border-radius: 12px; display: block; margin: 1.2em auto; }
+  .s { border-radius: 4px; transition: background .25s, box-shadow .25s; }
+  .s.now { background: rgb(var(--glow-rgb) / .28); box-shadow: 0 0 0 3px rgb(var(--glow-rgb) / calc(.28 * var(--fx))); }
+  #msg { max-width: 560px; margin: 80px auto; text-align: center; color: var(--muted); line-height: 1.6; padding: 0 24px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+  html.reduce *, html.reduce *::before, html.reduce *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+</style>
+</head>
+<body>
+  <div id="tools">
+    <button class="p" id="play">&#9654; Read aloud</button>
+    <button class="i" id="stop" aria-label="Stop" disabled>&#9632;</button>
+    <select id="rate" aria-label="Speed"><option value="0.8">0.8x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select>
+    <button class="i" id="sm" aria-label="Smaller text">A&#8722;</button>
+    <button class="i" id="lg" aria-label="Larger text">A+</button>
+    <select id="font" aria-label="Font"><option value="sans">Sans</option><option value="serif">Serif</option><option value="easy">Easy read</option></select>
+  </div>
+  <div id="msg" style="display:none"></div>
+  <article id="art" style="display:none"><h1 id="ttl"></h1><div class="meta" id="meta"></div><div id="body"></div></article>
+  <script>
+    const api = window.tidePage;
+    const $ = (id) => document.getElementById(id);
+    const root = document.documentElement;
+    let doc = null;
+    const queue = [];
+    const prefs = { fs: 18, font: 'sans', rate: '1' };
+    try { Object.assign(prefs, JSON.parse(localStorage.getItem('tide-reader') || '{}')); } catch { /* storage unavailable */ }
+    const savePrefs = () => { try { localStorage.setItem('tide-reader', JSON.stringify(prefs)); } catch { /* ignore */ } };
+
+    function applyPrefs() {
+      root.style.setProperty('--fs', `${prefs.fs}px`);
+      const F = { sans: ['system-ui, "Roboto", sans-serif', 1.7, '0', '0'], serif: ['"Noto Serif", Georgia, serif', 1.75, '0', '0'], easy: ['Verdana, "Roboto", sans-serif', 1.9, '0.04em', '0.14em'] }[prefs.font] || [];
+      root.style.setProperty('--ff', F[0]); root.style.setProperty('--lh', F[1]); root.style.setProperty('--ls', F[2]); root.style.setProperty('--ws', F[3]);
+      $('font').value = prefs.font; $('rate').value = prefs.rate;
+    }
+
+    function sentences(text) {
+      const parts = String(text).match(/[^.!?]+(?:[.!?]+["')\]]*|$)\s*/g);
+      return (parts || [text]).map((s) => s.trim()).filter(Boolean);
+    }
+
+    function build() {
+      $('ttl').textContent = doc.title; document.title = doc.title;
+      $('meta').textContent = [doc.byline, doc.site].filter(Boolean).join('  ·  ');
+      const body = $('body');
+      let ul = null;
+      const addText = (el, text) => {
+        sentences(text).forEach((s, i, all) => {
+          const span = document.createElement('span'); span.className = 's'; span.textContent = s + (i < all.length - 1 ? ' ' : '');
+          span.onclick = () => { if (playing) speakFrom(queue.indexOf(span)); };
+          el.appendChild(span); queue.push(span);
+        });
+      };
+      queue.length = 0;
+      const t = $('ttl'); const tt = t.textContent; t.textContent = ''; addText(t, tt);
+      for (const b of doc.blocks) {
+        if (b.t !== 'li') ul = null;
+        if (b.t === 'img') { const im = document.createElement('img'); im.src = b.src; im.alt = b.alt || ''; im.referrerPolicy = 'no-referrer'; im.loading = 'lazy'; body.appendChild(im); continue; }
+        let el;
+        if (b.t === 'li') { if (!ul) { ul = document.createElement('ul'); body.appendChild(ul); } el = document.createElement('li'); ul.appendChild(el); }
+        else { el = document.createElement({ h2: 'h2', h3: 'h3', quote: 'blockquote', pre: 'pre' }[b.t] || 'p'); body.appendChild(el); }
+        if (b.t === 'pre') el.textContent = b.text; else addText(el, b.text);
+      }
+    }
+
+    // ---------- read aloud, one sentence at a time so the current one can be highlighted ----------
+    let idx = -1; let playing = false; let token = 0;
+    function buttons() { $('play').innerHTML = playing ? '&#10074;&#10074; Pause' : (idx > 0 ? '&#9654; Resume' : '&#9654; Read aloud'); $('stop').disabled = !playing && idx <= 0; }
+    function mark(i) {
+      queue.forEach((s) => s.classList.remove('now'));
+      const s = queue[i]; if (!s) return; s.classList.add('now');
+      s.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    function next() {
+      if (!playing) return;
+      if (idx >= queue.length) { stop(); return; }
+      mark(idx);
+      token++;
+      api.speak(queue[idx].textContent, Number(prefs.rate) || 1, token).catch(() => stop());
+    }
+    addEventListener('tide:speechDone', (e) => { if (playing && String(e.detail.id) === String(token)) { idx++; next(); } });
+    function speakFrom(i) { if (i < 0) return; idx = i; playing = true; next(); buttons(); }
+    function pause() { playing = false; token++; api.speechStop(); buttons(); }
+    function stop() { playing = false; token++; idx = -1; api.speechStop(); queue.forEach((s) => s.classList.remove('now')); buttons(); }
+
+    $('play').onclick = () => {
+      if (playing) pause();
+      else if (idx > 0) speakFrom(idx);
+      else speakFrom(Math.max(0, queue.findIndex((s) => s.getBoundingClientRect().bottom > 70)));
+    };
+    $('stop').onclick = stop;
+    $('rate').onchange = (e) => { prefs.rate = e.target.value; savePrefs(); if (playing) speakFrom(idx); };
+    $('sm').onclick = () => { prefs.fs = Math.max(14, prefs.fs - 1); applyPrefs(); savePrefs(); };
+    $('lg').onclick = () => { prefs.fs = Math.min(30, prefs.fs + 1); applyPrefs(); savePrefs(); };
+    $('font').onchange = (e) => { prefs.font = e.target.value; applyPrefs(); savePrefs(); };
+    addEventListener('pagehide', () => api.speechStop());
+    document.addEventListener('visibilitychange', () => { if (document.hidden && playing) pause(); });
+
+    applyPrefs();
+    api.readerDoc().then((d) => {
+      if (!d) { const m = $('msg'); m.style.display = 'block'; m.textContent = 'There is no article to show. Open a page, then choose Reader view from the menu.'; $('tools').style.display = 'none'; return; }
+      doc = d; $('art').style.display = 'block'; build();
+    });
+  </script>
+</body>
+</html>

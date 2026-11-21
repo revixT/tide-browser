@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark palette. Same tokens as src/theme.css on desktop. -->
+<resources>
+    <color name="bg">#0C0D10</color>
+    <color name="surface">#131419</color>
+    <color name="surface2">#1A1B21</color>
+    <color name="line">#1F2127</color>
+    <color name="border">#2D3039</color>
+    <color name="text">#E6E8ED</color>
+    <color name="text_strong">#F6F7FA</color>
+    <color name="muted">#868B99</color>
+    <color name="accent">#8BA3FF</color>
+    <color name="accent_bg">#3F55CF</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="ok">#6FD89A</color>
+    <color name="bad">#FF8F8F</color>
+    <color name="private_tint">#D9C7FF</color>
+    <color name="scrim">#A6000000</color>
+    <color name="splash_bg">#0C0D10</color>
+</resources>

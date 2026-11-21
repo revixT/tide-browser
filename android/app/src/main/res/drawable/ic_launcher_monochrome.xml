@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Line version of the mark for Android 13 themed icons (same as the toolbar glyph on desktop). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2.3"
+        android:scaleY="2.3"
+        android:translateX="26.4"
+        android:translateY="26.4">
+        <path
+            android:pathData="M2.4,12a9.6,9.6 0 1,0 19.2,0a9.6,9.6 0 1,0 -19.2,0"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.6" />
+        <path
+            android:pathData="M2.6,10.4q2.35,-2.4 4.7,0t4.7,0t4.7,0t4.7,0"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="1.6" />
+        <path
+            android:pathData="M4,15.4q2.1,2.1 4.2,0t4.2,0t4.2,0t3.4,0"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="1.6" />
+    </group>
+</vector>

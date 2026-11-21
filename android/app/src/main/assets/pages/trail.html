@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<link rel="stylesheet" href="../theme.css">
+<link rel="stylesheet" href="shared.css">
+<title>Trail</title>
+<script src="bridge.js"></script>
+<style>
+  /* Tide for Android: same as desktop src/pages/trail.html, sized for touch. */
+  .lead { color: var(--muted); font-size: 13.5px; margin: 10px 10px 12px; line-height: 1.5; }
+  .kids { margin-left: 16px; padding-left: 10px; border-left: 1px solid rgb(var(--glow-rgb) / .3); }
+  .nr { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 14px; min-height: 56px; transition: background .25s, transform .3s var(--spring); animation: rowIn .45s var(--expo) backwards; animation-delay: calc(min(var(--i), 14) * 22ms); }
+  .nr:active { background: rgb(var(--ov) / .07); transform: scale(.985); }
+  .nr.here { background: rgb(var(--glow-rgb) / .18); box-shadow: inset 0 0 0 1px rgb(var(--glow-rgb) / calc(.45 * var(--fx))); }
+  .nr.path .dot { background: var(--accent); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--border); flex: none; }
+  .tg { width: 32px; height: 32px; flex: none; border: 0; background: none; color: var(--muted); padding: 0; font-size: 11px; border-radius: 10px; transition: transform .3s var(--spring); }
+  .tg.open { transform: rotate(90deg); }
+  .tg.none { visibility: hidden; }
+  .nr .col { flex: 1; min-width: 0; }
+  .nr .a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; }
+  .nr .b { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; }
+  .btn.danger { border-color: rgb(var(--bad-rgb) / .5); }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <div class="top"><h1>Trail</h1><button class="btn danger" id="clear">Clear</button></div>
+    <input type="search" class="search" id="q" placeholder="Search pages you passed through" autocomplete="off">
+  </header>
+  <main>
+    <p class="lead">Each page links to the one you came from. Pages you opened in a new tab hang off the page that opened them. Private tabs are never recorded. Tap a page to open it in a new tab.</p>
+    <div id="tree"></div>
+  </main>
+  <script>
+    const api = window.tidePage;
+    const tree = document.getElementById('tree');
+    let nodes = [];
+    let byId = new Map();
+    let kids = new Map();
+    const open = new Set();
+    const target = (location.hash.match(/n=([^&]+)/) || [])[1] || '';
+    const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+    const when = (t) => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    function build() {
+      byId = new Map(nodes.map((n) => [n.id, n]));
+      kids = new Map();
+      const roots = [];
+      for (const n of nodes) {
+        if (n.parent && byId.has(n.parent)) { if (!kids.has(n.parent)) kids.set(n.parent, []); kids.get(n.parent).push(n); } else roots.push(n);
+      }
+      return roots.sort((a, b) => b.time - a.time);
+    }
+    function pathTo(id) { const p = new Set(); let n = byId.get(id); while (n) { p.add(n.id); n = byId.get(n.parent); } return p; }
+
+    function row(n, counter, pathSet) {
+      const wrap = document.createElement('div');
+      const r = document.createElement('div'); r.className = 'nr' + (n.id === target ? ' here' : '') + (pathSet.has(n.id) ? ' path' : ''); r.style.setProperty('--i', counter.n++);
+      const ch = kids.get(n.id) || [];
+      const tg = document.createElement('button'); tg.className = 'tg' + (ch.length ? '' : ' none') + (open.has(n.id) ? ' open' : ''); tg.textContent = '▶';
+      tg.onclick = (e) => { e.stopPropagation(); if (open.has(n.id)) open.delete(n.id); else open.add(n.id); render(); };
+      const dot = document.createElement('div'); dot.className = 'dot';
+      const col = document.createElement('div'); col.className = 'col';
+      const a = document.createElement('div'); a.className = 'a'; a.textContent = n.title || host(n.url);
+      const b = document.createElement('div'); b.className = 'b'; b.textContent = `${host(n.url)}  ·  ${when(n.time)}${ch.length ? `  ·  ${ch.length} next` : ''}`;
+      col.append(a, b);
+      r.append(tg, dot, col);
+      r.onclick = () => api.openTab(n.url);
+      wrap.appendChild(r);
+      if (ch.length && open.has(n.id)) {
+        const k = document.createElement('div'); k.className = 'kids';
+        ch.sort((x, y) => x.time - y.time).forEach((c2) => k.appendChild(row(c2, counter, pathSet)));
+        wrap.appendChild(k);
+      }
+      return wrap;
+    }
+
+    function render() {
+      tree.textContent = '';
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const counter = { n: 0 };
+      if (!nodes.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No trail yet. Browse a few pages and they will appear here.'; tree.appendChild(e); return; }
+      if (q) {
+        const hits = nodes.filter((n) => `${n.title} ${n.url}`.toLowerCase().includes(q)).sort((a, b) => b.time - a.time).slice(0, 80);
+        if (!hits.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Nothing matches that.'; tree.appendChild(e); }
+        hits.forEach((n) => tree.appendChild(row({ ...n }, counter, new Set())));
+        return;
+      }
+      const pathSet = target ? pathTo(target) : new Set();
+      build().slice(0, 120).forEach((n) => tree.appendChild(row(n, counter, pathSet)));
+    }
+
+    function init() {
+      build();
+      if (target) { for (const id of pathTo(target)) open.add(id); }
+      else for (const r of build().slice(0, 6)) open.add(r.id);
+      render();
+      const here = tree.querySelector('.nr.here');
+      if (here) here.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    document.getElementById('q').addEventListener('input', render);
+    document.getElementById('clear').onclick = async function () {
+      if (!nodes.length) return;
+      if (this.dataset.armed !== '1') { this.dataset.armed = '1'; this.textContent = 'Tap again'; setTimeout(() => { this.dataset.armed = ''; this.textContent = 'Clear'; }, 3500); return; }
+      await api.trailClear(); nodes = []; this.textContent = 'Clear'; this.dataset.armed = ''; render();
+    };
+    api.trailGet().then((l) => { nodes = l; init(); });
+  </script>
+</body>
+</html>

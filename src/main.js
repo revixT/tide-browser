@@ -300,6 +300,7 @@ function layout() {
   ui.setBounds({ x: 0, y: 0, width: htmlFullscreen ? 0 : w, height: htmlFullscreen ? 0 : h });
   const t = activeTab();
   if (t) t.view.setBounds({ x: left, y: top, width: Math.max(0, w - left), height: Math.max(0, h - top) });
+  layoutPanel();
 }
 
 // ---------- theme ----------
@@ -572,6 +573,8 @@ function pickSuggest(i) {
   if (it.kind === 'tab' && tabs.has(it.tabId)) { selectTab(it.tabId); return; }
   const t = activeTab();
   if (!t) return;
+  if (panelName(it.target)) { openPanel(it.target); return; }
+  closePanel();
   tabWc(t).loadURL(it.target);
   tabWc(t).focus();
 }
@@ -582,6 +585,8 @@ function pickSuggest(i) {
 function pinnedCount() { return order.filter((id) => tabs.get(id).pinned).length; }
 
 function createTab(rawUrl, { activate = true, isPrivate = false, pinned = false, afterId = null, openerId = null } = {}) {
+  const target = normalizeInput(rawUrl || NEWTAB_URL);
+  if (panelName(target) && activeId != null) { openPanel(target); return activeId; }
   const id = nextId++;
   if (isPrivate) configureSession(session.fromPartition(PRIVATE_PARTITION), true);
   const view = new WebContentsView({
@@ -609,16 +614,112 @@ function createTab(rawUrl, { activate = true, isPrivate = false, pinned = false,
   win.contentView.addChildView(view);
   view.setVisible(false);
   wire(tab);
-  view.webContents.loadURL(normalizeInput(rawUrl || NEWTAB_URL));
+  view.webContents.loadURL(panelName(target) ? NEWTAB_URL : target);
   if (activate) selectTab(id); else sendState();
   return id;
 }
 
 function openPrivateTab(url) { return createTab(url || `${NEWTAB_URL}#private`, { isPrivate: true }); }
 
+// ======================================================================
+// Panel: Tide's own pages (Settings, History, Focus...) slide in over the page area
+// instead of opening as tabs. The new tab, Reader and warning pages stay in tabs.
+// ======================================================================
+const PANEL_PAGES = new Set(['history', 'bookmarks', 'downloads', 'settings', 'passwords', 'explore', 'recall',
+  'orbits', 'trail', 'constellations', 'focus', 'snapshots']);
+let panelView = null;
+const panel = { open: false, offset: 0, timer: null };
+
+function panelName(url) {
+  if (typeof url !== 'string' || !url.startsWith(PAGES_URL)) return null;
+  const base = url.split(/[?#]/)[0];
+  for (const n of PANEL_PAGES) if (INTERNAL[n] === base) return n;
+  return null;
+}
+
+function createPanelView() {
+  panelView = new WebContentsView({
+    webPreferences: { preload: path.join(__dirname, 'page-preload.js'), contextIsolation: true, sandbox: true, spellcheck: true },
+  });
+  panelView.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#0c0d10' : '#f7f8fa');
+  panelView.setVisible(false);
+  win.contentView.addChildView(panelView);
+  const wc = panelView.webContents;
+  // Web links inside a panel page open in your tab; moving between Tide pages stays in the panel.
+  wc.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/i.test(url)) { closePanel(); createTab(url); }
+    return { action: 'deny' };
+  });
+  wc.on('will-navigate', (e, url) => {
+    if (panelName(url)) return;
+    e.preventDefault();
+    if (/^https?:/i.test(url)) { closePanel(); const t = activeTab(); if (t) tabWc(t).loadURL(url); }
+  });
+  wc.on('before-input-event', (_e, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') closePanel();
+  });
+  wc.on('render-process-gone', () => {
+    panel.open = false;
+    try { win.contentView.removeChildView(panelView); } catch { /* window closing */ }
+    panelView = null;
+  });
+}
+
+function layoutPanel() {
+  if (!panelView || !panel.open || !win) return;
+  const [w, h] = win.getContentSize();
+  const top = htmlFullscreen ? 0 : TOP_HEIGHT + Math.round(extraOffset);
+  const left = htmlFullscreen ? 0 : SIDEBAR_W;
+  const off = Math.round(panel.offset);
+  panelView.setBounds({ x: left + off, y: top, width: Math.max(0, w - left), height: Math.max(0, h - top) });
+}
+
+function openPanel(url) {
+  if (!panelName(url) || !win) return;
+  if (!panelView) createPanelView();
+  hideSuggest();
+  if (pop.visible) hidePopover();
+  if (fx) { fx.closePeek(); fx.closeCmd(); }
+  const u = new URL(url);
+  u.searchParams.set('panel', '1');
+  panelView.webContents.loadURL(u.href);
+  win.contentView.addChildView(panelView); // re-adding moves it above the tab views
+  panelView.setVisible(true);
+  if (!panel.open) {
+    panel.open = true;
+    // slide in from the right
+    clearInterval(panel.timer);
+    panel.offset = settings.reduceMotion ? 0 : 70;
+    panel.timer = setInterval(() => {
+      panel.offset *= 0.62;
+      if (panel.offset < 0.5) { panel.offset = 0; clearInterval(panel.timer); }
+      layoutPanel();
+    }, 16);
+  }
+  layoutPanel();
+  panelView.webContents.focus();
+}
+
+function closePanel() {
+  if (!panel.open || !panelView) return;
+  panel.open = false;
+  clearInterval(panel.timer);
+  panelView.setVisible(false);
+  panelView.webContents.loadURL('about:blank');
+  const t = activeTab();
+  if (t) tabWc(t).focus();
+}
+
+// Load an address in a tab, unless it is a Tide page that belongs in the panel.
+function loadIn(wc, url) {
+  if (panelName(url)) { openPanel(url); return; }
+  wc.loadURL(url);
+}
+
 function selectTab(id) {
   if (!tabs.has(id)) return;
   hideSuggest();
+  closePanel();
   if (pop.visible && activeId !== id) hidePopover();
   if (fx && activeId !== id) { fx.closePeek(); fx.closeCmd(); }
   const prevTab = tabs.get(activeId);
@@ -1493,6 +1594,8 @@ function openStartupTabs(argvUrl) {
     activeIdx = list.length - 1;
   }
   if (argvUrl) { list.push({ url: argvUrl }); activeIdx = list.length - 1; }
+  // Older sessions may have Tide pages saved as tabs; those now live in the panel.
+  list = list.map((t) => (panelName(t.url) ? { ...t, url: NEWTAB_URL } : t));
   const ids = list.map((t) => createTab(t.url, { activate: false, pinned: !!t.pinned }));
   selectTab(ids[clamp(activeIdx, 0, ids.length - 1)]);
   sessionEnabled = true;
@@ -1541,18 +1644,22 @@ ipcMain.handle('tab:contextmenu', guardUi((id) => {
 ipcMain.handle('nav:go', guardUi((raw) => {
   const t = activeTab();
   if (!t) return;
-  tabWc(t).loadURL(normalizeInput(raw));
+  const url = normalizeInput(raw);
+  if (panelName(url)) { openPanel(url); return; }
+  closePanel();
+  tabWc(t).loadURL(url);
   tabWc(t).focus();
 }));
-ipcMain.handle('nav:back', guardUi(() => { const t = activeTab(); if (t && tabWc(t).navigationHistory.canGoBack()) tabWc(t).navigationHistory.goBack(); }));
+ipcMain.handle('nav:back', guardUi(() => { if (panel.open) { closePanel(); return; } const t = activeTab(); if (t && tabWc(t).navigationHistory.canGoBack()) tabWc(t).navigationHistory.goBack(); }));
 ipcMain.handle('nav:forward', guardUi(() => { const t = activeTab(); if (t && tabWc(t).navigationHistory.canGoForward()) tabWc(t).navigationHistory.goForward(); }));
 ipcMain.handle('nav:reload', guardUi(() => activeTab() && tabWc(activeTab()).reload()));
 ipcMain.handle('nav:stop', guardUi(() => activeTab() && tabWc(activeTab()).stop()));
-ipcMain.handle('nav:home', guardUi(() => activeTab() && tabWc(activeTab()).loadURL(activeTab().private ? `${NEWTAB_URL}#private` : NEWTAB_URL)));
+ipcMain.handle('nav:home', guardUi(() => closePanel() || activeTab() && tabWc(activeTab()).loadURL(activeTab().private ? `${NEWTAB_URL}#private` : NEWTAB_URL)));
 ipcMain.handle('nav:history', guardUi(() => createTab(HISTORY_URL)));
 ipcMain.handle('nav:internal', guardUi((name) => {
   const url = INTERNAL[name];
   if (!url) return;
+  if (panelName(url)) { openPanel(url); return; }
   const t = activeTab();
   // Reuse the current tab if it is a blank new tab, otherwise open a new one.
   if (t && isNewTab(tabWc(t).getURL()) && !t.private) tabWc(t).loadURL(url);
@@ -1745,7 +1852,19 @@ handleInternal('setSettings', (_e, patch) => {
   sendState();
 });
 handleInternal('getShortcuts', () => settings.shortcuts || null);
-handleInternal('navigate', (e, raw) => { e.sender.loadURL(normalizeInput(raw)); });
+handleInternal('navigate', (e, raw) => {
+  const url = normalizeInput(raw);
+  if (panelView && e.sender === panelView.webContents) {
+    // From a panel page: another Tide page stays in the panel, anything else opens in your tab.
+    if (panelName(url)) { openPanel(url); return; }
+    closePanel();
+    const t = activeTab();
+    if (t) { tabWc(t).loadURL(url); tabWc(t).focus(); }
+    return;
+  }
+  loadIn(e.sender, url);
+});
+handleInternal('closePanel', () => closePanel());
 handleInternal('relaunch', () => { flushSaves(); app.relaunch(); app.exit(0); });
 handleInternal('openDefaultApps', () => {
   if (IS_MAC) {
