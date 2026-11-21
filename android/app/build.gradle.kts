@@ -14,8 +14,9 @@ android {
         applicationId = "com.tide.browser"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        // Keep versionName in step with the desktop version in package.json. versionCode must go up with every release.
+        versionCode = 4
+        versionName = "1.0.4"
     }
 
     signingConfigs {
